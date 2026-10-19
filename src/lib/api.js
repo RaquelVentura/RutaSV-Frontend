@@ -1,7 +1,7 @@
-const BASE_URL = '/api'
+const baseUrl = '/api'
 
 export async function apiFetch(path, options = {}) {
-  const response = await fetch(`${BASE_URL}${path}`, {
+  const response = await fetch(`${baseUrl}${path}`, {
     ...options,
     headers: { Accept: 'application/json', ...options.headers },
   })
