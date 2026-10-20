@@ -1,4 +1,5 @@
 import { Link, Route, Routes } from 'react-router-dom'
+import Login from './pages/Auth/Login.jsx'
 import Home from './pages/Home.jsx'
 import NotFound from './pages/NotFound.jsx'
 
@@ -15,6 +16,7 @@ function App() {
       <main className="mx-auto max-w-5xl px-4 py-8">
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/login" element={<Login />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>

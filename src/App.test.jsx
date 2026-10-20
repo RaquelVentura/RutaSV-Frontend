@@ -19,6 +19,16 @@ describe('App', () => {
     ).toBeInTheDocument()
   })
 
+  it('muestra el formulario de inicio de sesión en /login', () => {
+    renderAt('/login')
+    expect(
+      screen.getByRole('heading', { name: /qué bueno verte de nuevo/i }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: /iniciar sesión/i }),
+    ).toBeInTheDocument()
+  })
+
   it('muestra 404 en rutas desconocidas', () => {
     renderAt('/no-existe')
     expect(

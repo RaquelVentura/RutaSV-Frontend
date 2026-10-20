@@ -1,7 +1,49 @@
-import React from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
 export default function Login() {
+  const [errors, setErrors] = useState({});
+
+  function getFieldError(input) {
+    if (input.validity.valueMissing) {
+      return input.name === 'email'
+        ? 'Ingresa tu correo electrónico.'
+        : 'Ingresa tu contraseña.';
+    }
+
+    if (input.name === 'email' && input.validity.typeMismatch) {
+      return 'Ingresa un correo electrónico válido.';
+    }
+
+    return '';
+  }
+
+  function handleSubmit(event) {
+    event.preventDefault();
+
+    const form = event.currentTarget;
+    const emailError = getFieldError(form.elements.email);
+    const passwordError = getFieldError(form.elements.password);
+    const nextErrors = { email: emailError, password: passwordError };
+
+    setErrors(nextErrors);
+
+    if (emailError || passwordError) {
+      form.elements[emailError ? 'email' : 'password'].focus();
+    }
+  }
+
+  function handleChange(event) {
+    const input = event.target;
+
+    if (errors[input.name]) {
+      setErrors((currentErrors) => ({
+        ...currentErrors,
+        [input.name]: getFieldError(input),
+      }));
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-between py-8 px-4 sm:px-6 lg:px-8">
       {/* Contenedor principal centrado */}
@@ -18,7 +60,10 @@ export default function Login() {
         {/* Barra de búsqueda */}
         <div className="relative mb-6">
           <span className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-gray-400">
-            🔍
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4">
+  <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+</svg>
+
           </span>
           <input
             type="text"
@@ -53,27 +98,55 @@ export default function Login() {
         </div>
 
         {/* Formulario de Inicio de Sesión */}
-        <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+        <form className="space-y-4" noValidate onSubmit={handleSubmit}>
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+            <label htmlFor="login-email" className="block text-xs font-semibold text-gray-700 mb-1.5">
               Correo electrónico
             </label>
             <input
+              id="login-email"
+              name="email"
               type="email"
+              autoComplete="email"
+              required
               placeholder="ana.lopez@correo.com"
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-600 transition"
+              aria-invalid={Boolean(errors.email)}
+              aria-describedby={errors.email ? 'login-email-error' : undefined}
+              onChange={handleChange}
+              className={`w-full px-4 py-3 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-600 transition ${
+                errors.email ? 'border-red-500' : 'border-gray-200'
+              }`}
             />
+            {errors.email && (
+              <p id="login-email-error" className="mt-1 text-xs text-red-600" role="alert">
+                {errors.email}
+              </p>
+            )}
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+            <label htmlFor="login-password" className="block text-xs font-semibold text-gray-700 mb-1.5">
               Contraseña
             </label>
             <input
+              id="login-password"
+              name="password"
               type="password"
+              autoComplete="current-password"
+              required
               placeholder="••••••••••••"
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-600 transition"
+              aria-invalid={Boolean(errors.password)}
+              aria-describedby={errors.password ? 'login-password-error' : undefined}
+              onChange={handleChange}
+              className={`w-full px-4 py-3 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-600 transition ${
+                errors.password ? 'border-red-500' : 'border-gray-200'
+              }`}
             />
+            {errors.password && (
+              <p id="login-password-error" className="mt-1 text-xs text-red-600" role="alert">
+                {errors.password}
+              </p>
+            )}
           </div>
 
           <div className="flex items-center justify-between text-xs pt-1">
