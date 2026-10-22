@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 
 export default function Login() {
   const [errors, setErrors] = useState({});
+  const [notice, setNotice] = useState('');
 
   function getFieldError(input) {
     if (input.validity.valueMissing) {
@@ -29,8 +30,14 @@ export default function Login() {
     setErrors(nextErrors);
 
     if (emailError || passwordError) {
+      setNotice('');
       form.elements[emailError ? 'email' : 'password'].focus();
+      return;
     }
+
+    setNotice(
+      'El inicio de sesión requiere conectar el backend. No se inició ninguna sesión.',
+    );
   }
 
   function handleChange(event) {
@@ -51,9 +58,9 @@ export default function Login() {
         
         {/* Cabecera: Logo y Selector de Idioma */}
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-cyan-700 tracking-tight">RutaSV</h1>
+          <h1 className="text-2xl font-bold text-[#087E9A] tracking-tight">RutaSV</h1>
           <button className="flex items-center text-sm font-medium text-gray-700 hover:text-gray-900">
-            ES / EN <span className="ml-1 text-xs">▼</span>
+            <span className="ml-1 text-xs"></span>
           </button>
         </div>
 
@@ -72,16 +79,6 @@ export default function Login() {
           />
         </div>
 
-        {/* Botones de Explorar / Registro superior */}
-        <div className="grid grid-cols-2 gap-3 mb-6">
-          <button className="w-full py-2.5 border border-gray-300 rounded-full text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
-            Login
-          </button>
-          <button className="w-full py-2.5 bg-cyan-700 rounded-full text-sm font-medium text-white hover:bg-cyan-800 transition">
-            Registro
-          </button>
-        </div>
-
         <hr className="border-gray-100 mb-8" />
 
         {/* Sección de Bienvenida */}
@@ -96,6 +93,15 @@ export default function Login() {
             Ingresa para seguir descubriendo El Salvador.
           </p>
         </div>
+
+        {notice && (
+          <p
+            className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"
+            role="status"
+          >
+            {notice}
+          </p>
+        )}
 
         {/* Formulario de Inicio de Sesión */}
         <form className="space-y-4" noValidate onSubmit={handleSubmit}>
@@ -168,7 +174,7 @@ export default function Login() {
 
           <div className="text-center pt-3">
             <span className="text-xs text-gray-500">¿Aún no tienes cuenta? </span>
-            <Link to="#" className="text-xs text-cyan-700 font-semibold hover:underline">
+            <Link to="/registro" className="text-xs text-cyan-700 font-semibold hover:underline">
               Crear una cuenta
             </Link>
           </div>
