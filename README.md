@@ -37,7 +37,7 @@ Este documento reúne todo lo que necesitas para trabajar en la interfaz de **Ru
 
 ### 3.1 Clona el repositorio
 ```bash
-git clone <url-del-repo-del-frontend>
+git clone https://github.com/RaquelVentura/RutaSV-Frontend
 cd RutaSV-Fronted
 ```
 
