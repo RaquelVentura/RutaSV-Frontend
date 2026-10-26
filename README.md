@@ -23,19 +23,12 @@ Este documento reúne todo lo que necesitas para trabajar en la interfaz de **Ru
 ## 2. Qué necesitas instalado
 
 1. **Git** — [git-scm.com](https://git-scm.com/).
-
 2. **Node 22 o superior** — [nodejs.org](https://nodejs.org/). Compruébalo con `node -v`.
-
 3. **VS Code** — [code.visualstudio.com](https://code.visualstudio.com/), con estas extensiones:
-
-   * ESLint (`dbaeumer.vscode-eslint`)
-
-   * Tailwind CSS IntelliSense (`bradlc.vscode-tailwindcss`)
-
-   * *(opcional)* ES7+ React snippets
-
+   * ESLint (`dbaeumer.vscode-eslint`)
+   * Tailwind CSS IntelliSense (`bradlc.vscode-tailwindcss`)
+   * *(opcional)* ES7+ React snippets
 4. **Docker Desktop** — solo si quieres probar la imagen de producción.
-
 5. **El backend en marcha** — cuando toque conectar el front con datos reales (sigue el README de `RutaSV-Backend`).
 
 ---
@@ -43,18 +36,15 @@ Este documento reúne todo lo que necesitas para trabajar en la interfaz de **Ru
 ## 3. Primer arranque
 
 ### 3.1 Clona el repositorio
-
 ```bash
-git clone https://github.com/RaquelVentura/RutaSV-Frontend
+git clone <url-del-repo-del-frontend>
 cd RutaSV-Fronted
 ```
 
 ### 3.2 Trabaja siempre en tu propia rama
-
 > ⚠️ **Regla del equipo:** no se programa directamente en `main` ni en `develop`. Cada tarea o historia de usuario tiene su rama.
 
 Si la rama ya existe en GitHub:
-
 ```bash
 git fetch origin
 git checkout nombre-de-tu-rama
@@ -62,7 +52,6 @@ git pull origin nombre-de-tu-rama
 ```
 
 Si vas a empezar una tarea nueva (ejemplo HU-02):
-
 ```bash
 git checkout develop
 git pull origin develop
@@ -70,23 +59,19 @@ git checkout -b feature/HU-02-descripcion-corta
 ```
 
 ### 3.3 Instala las librerías
-
 ```bash
 npm install
 ```
-
 Crea la carpeta `node_modules`. La primera vez puede tardar un par de minutos.
 
 ### 3.4 Crea tu `.env`
-
 Copia la plantilla incluida en el repo:
 
 ```bash
-cp .env.example .env              # Git Bash, Linux o macOS
+cp .env.example .env              # Git Bash, Linux o macOS
 ```
-
 ```powershell
-Copy-Item .env.example .env       # Windows PowerShell
+Copy-Item .env.example .env       # Windows PowerShell
 ```
 
 | Variable | Valor por defecto | Función |
@@ -98,11 +83,9 @@ Copy-Item .env.example .env       # Windows PowerShell
 Este archivo está en `.gitignore`, así que tus valores no se suben a GitHub.
 
 ### 3.5 Arranca la app
-
 ```bash
 npm run dev
 ```
-
 Abre **http://localhost:5173** (o la dirección que imprima la consola). Edita cualquier archivo de `src/`, guarda con `Ctrl + S` y verás el cambio al instante. Para detenerla: `Ctrl + C`.
 
 ---
@@ -112,10 +95,9 @@ Abre **http://localhost:5173** (o la dirección que imprima la consola). Edita c
 **A. En tu equipo, con `npm run dev` (la de todos los días).** Es la más rápida: recarga al guardar. Hoy el front aún no consume el backend, así que no necesitas tenerlo encendido.
 
 **B. Imagen de producción.** Para comprobar lo que realmente se despliega:
-
 ```bash
-docker compose up --build     # abre http://localhost:5173
-docker compose down           # para apagarlo
+docker compose up --build     # abre http://localhost:5173
+docker compose down           # para apagarlo
 ```
 
 ---
@@ -124,38 +106,38 @@ docker compose down           # para apagarlo
 
 ```
 RutaSV-Fronted/
-├── index.html                  Página única con <div id="root">
-├── package.json                Dependencias y scripts
-├── vite.config.js              Plugins (React, Tailwind), proxy /api y config de pruebas
-├── eslint.config.js            Reglas del linter
-├── .editorconfig               Formato: UTF-8, LF, 2 espacios
-├── .env / .env.example         Ajustes locales (.env no se sube)
-├── .nvmrc                      Versión de Node (22)
-├── Dockerfile                  Compila y sirve con Nginx
-├── docker-compose.yml          Levanta solo el front
-├── nginx.conf.template         Nginx: SPA + proxy /api
-├── .github/workflows/ci.yml    Integración continua
-├── public/                     Archivos estáticos (favicon.svg)
-├── dist/                       Resultado del build (se genera solo)
-└── src/                        ← aquí se trabaja
-    ├── main.jsx                Punto de entrada: monta <App /> dentro de <BrowserRouter>
-    ├── App.jsx                 Rutas de la aplicación y estado del usuario
-    ├── App.test.jsx            Pruebas de las rutas
-    ├── index.css               Importa Tailwind
-    ├── layouts/
-    │   ├── AppLayout.jsx       Barra superior (logo, iniciar sesión / registro / cerrar sesión) y contenedor
-    │   └── AppLayout.test.jsx
-    ├── pages/                  Una pantalla por archivo
-    │   ├── Home.jsx            Portada
-    │   ├── NotFound.jsx        Página 404
-    │   └── Auth/
-    │       ├── Login.jsx / Login.test.jsx   Inicio de sesión
-    │       ├── Registration.jsx             Registro
-    │       ├── EmailVerification.jsx        Ingreso del código de 6 dígitos
-    │       └── VerificationResult.jsx       Resultado: aceptada o rechazada
-    ├── lib/
-    │   └── api.js              apiFetch: función base para hablar con el backend
-    └── test/setup.js           Preparación de las pruebas (jest-dom)
+├── index.html                  Página única con <div id="root">
+├── package.json                Dependencias y scripts
+├── vite.config.js              Plugins (React, Tailwind), proxy /api y config de pruebas
+├── eslint.config.js            Reglas del linter
+├── .editorconfig               Formato: UTF-8, LF, 2 espacios
+├── .env / .env.example         Ajustes locales (.env no se sube)
+├── .nvmrc                      Versión de Node (22)
+├── Dockerfile                  Compila y sirve con Nginx
+├── docker-compose.yml          Levanta solo el front
+├── nginx.conf.template         Nginx: SPA + proxy /api
+├── .github/workflows/ci.yml    Integración continua
+├── public/                     Archivos estáticos (favicon.svg)
+├── dist/                       Resultado del build (se genera solo)
+└── src/                        ← aquí se trabaja
+    ├── main.jsx                Punto de entrada: monta <App /> dentro de <BrowserRouter>
+    ├── App.jsx                 Rutas de la aplicación y estado del usuario
+    ├── App.test.jsx            Pruebas de las rutas
+    ├── index.css               Importa Tailwind
+    ├── layouts/
+    │   ├── AppLayout.jsx       Barra superior (logo, iniciar sesión / registro / cerrar sesión) y contenedor
+    │   └── AppLayout.test.jsx
+    ├── pages/                  Una pantalla por archivo
+    │   ├── Home.jsx            Portada
+    │   ├── NotFound.jsx        Página 404
+    │   └── Auth/
+    │       ├── Login.jsx / Login.test.jsx   Inicio de sesión
+    │       ├── Registration.jsx             Registro
+    │       ├── EmailVerification.jsx        Ingreso del código de 6 dígitos
+    │       └── VerificationResult.jsx       Resultado: aceptada o rechazada
+    ├── lib/
+    │   └── api.js              apiFetch: función base para hablar con el backend
+    └── test/setup.js           Preparación de las pruebas (jest-dom)
 ```
 
 ### ¿Dónde pongo mi código?
@@ -194,10 +176,10 @@ Si ya tienes una vista hecha con HTML y CSS, esta es la equivalencia:
 
 ```mermaid
 flowchart LR
-    U[Navegador] -->|"páginas y /assets/*"| F["Frontend<br/>(Vite en dev · Nginx en prod)"]
-    U -->|"/api/*"| F
-    F -->|proxy /api| A["API .NET<br/>RutaSV-Backend"]
-    A --> P[(PostgreSQL)]
+    U[Navegador] -->|"páginas y /assets/*"| F["Frontend<br/>(Vite en dev · Nginx en prod)"]
+    U -->|"/api/*"| F
+    F -->|proxy /api| A["API .NET<br/>RutaSV-Backend"]
+    A --> P[(PostgreSQL)]
 ```
 
 El navegador solo conversa con el frontend; este sirve la aplicación y reenvía `/api/*` al backend.
@@ -206,12 +188,12 @@ El navegador solo conversa con el frontend; este sirve la aplicación y reenvía
 
 ```mermaid
 flowchart TD
-    M[main.jsx] --> BR[BrowserRouter]
-    BR --> APP[App.jsx<br/>estado del usuario + rutas]
-    APP --> L[AppLayout<br/>barra superior]
-    L --> R{Route según la URL}
-    R --> PAGE[Página en src/pages]
-    PAGE -.-> LIB[lib/api.js → backend<br/>aún sin conectar]
+    M[main.jsx] --> BR[BrowserRouter]
+    BR --> APP[App.jsx<br/>estado del usuario + rutas]
+    APP --> L[AppLayout<br/>barra superior]
+    L --> R{Route según la URL}
+    R --> PAGE[Página en src/pages]
+    PAGE -.-> LIB[lib/api.js → backend<br/>aún sin conectar]
 ```
 
 ### 6.3 Rutas actuales (`src/App.jsx`)
@@ -227,15 +209,12 @@ flowchart TD
 | `*` | Página no encontrada (`NotFound`) |
 
 Cómo funciona hoy:
-
 * `App.jsx` guarda `user` con `useState` (arranca en `null`) y lo pasa a `AppLayout` y a `Home`. `AppLayout` muestra "Hola, nombre" y **Cerrar sesión** si hay usuario, o los enlaces **Iniciar sesión** y **Registro** si no.
 * Las pantallas de login, registro y verificación validan los campos en el navegador y avisan con mensajes en pantalla, pero **todavía no llaman al backend**. Los textos lo indican ("requieren conectar el backend").
 * Aún no hay rutas protegidas por rol ni persistencia de sesión: al recargar, `user` vuelve a `null`.
 
 ### 6.4 Validaciones de formularios
-
 Los formularios usan estado de React (`useState`) y la validación nativa del navegador (`input.validity`). Ejemplos ya hechos:
-
 * **Login:** correo y contraseña obligatorios; el correo debe tener formato válido.
 * **Registro:** nombre, correo y contraseña obligatorios; contraseña de al menos 8 caracteres; confirmación igual a la contraseña. Al enviar sin errores navega a `/registro/verificar` pasando el correo.
 * **Verificación:** el código debe tener exactamente 6 dígitos.
@@ -243,7 +222,6 @@ Los formularios usan estado de React (`useState`) y la validación nativa del na
 Si necesitas validar otro formulario, copia ese patrón: un objeto `errors`, un `handleSubmit` que lo llena y foco en el primer campo con error.
 
 ### 6.5 Estilos
-
 Hoy se usan las clases estándar de Tailwind (`bg-stone-50`, `rounded-full`, `text-stone-600`…) y el color de marca **`#087E9A`** escrito directamente (`bg-[#087E9A]`, `text-[#087E9A]`; su hover es `hover:bg-cyan-800`). `src/index.css` solo importa Tailwind. Para mantener la coherencia visual, usa estos mismos colores en las pantallas nuevas.
 
 ---
@@ -264,31 +242,25 @@ Lo que ya existe en el front para esa conexión es `src/lib/api.js`: `apiFetch(p
 | POST | `/api/auth/verify-email` | `{ token }` | `{ message }` · error 400 |
 
 Forma de `AuthResponse`:
-
 ```json
 {
-  "id": "guid",
-  "email": "usuario@correo.com",
-  "firstName": "Nombre",
-  "lastName": "Apellido",
-  "role": "VISITANTE",
-  "emailVerified": false,
-  "token": "jwt..."
+  "id": "guid",
+  "email": "usuario@correo.com",
+  "firstName": "Nombre",
+  "lastName": "Apellido",
+  "role": "VISITANTE",
+  "emailVerified": false,
+  "token": "jwt..."
 }
 ```
-
 Roles: `ADMIN`, `OPERADOR`, `VISITANTE`.
 
 ### ⚠️ Puntos por resolver al conectar front y back
 
 1. **Prefijo `/api`.** El backend expone `/api/auth/login`, pero el proxy del front (`rewrite` en `vite.config.js` y en `nginx.conf.template`) quita `/api` antes de reenviar, así que la petición llegaría como `/auth/login` y daría 404. Lo más simple es eliminar ambos `rewrite`.
-
 2. **Puerto.** `.env.example` apunta a `8080`; el backend de desarrollo en Docker usa `5000`.
-
 3. **Campos distintos.** El formulario de registro pide un solo campo `name`; el backend espera `firstName` y `lastName`.
-
 4. **Verificación de correo.** La pantalla del front pide un código de 6 dígitos; el endpoint del backend recibe un `token`. Hay que acordar si es código numérico o enlace.
-
 5. **Roles en el backend.** Por ahora ningún controlador usa `[Authorize(Roles = ...)]` (HU-07 está en curso).
 
 ---
@@ -309,7 +281,6 @@ Roles: `ADMIN`, `OPERADOR`, `VISITANTE`.
 | `docker compose down` | Apaga el contenedor | Al terminar |
 
 **Traer lo último de `develop` a tu rama sin cambiarte de rama:**
-
 ```bash
 git add . && git commit -m "wip"
 git fetch origin
@@ -328,15 +299,14 @@ git push
 El CI de GitHub Actions ejecuta lo mismo que puedes correr tú. Antes de subir o abrir un Pull Request hacia `develop`, lanza estos tres comandos desde la raíz del proyecto:
 
 ```bash
-npm run lint     # estilo y errores de código
-npm test         # pruebas
-npm run build    # el proyecto compila
+npm run lint     # estilo y errores de código
+npm test         # pruebas
+npm run build    # el proyecto compila
 ```
 
 Si los tres pasan en tu máquina, el pipeline saldrá en verde.
 
 ### Qué hace el CI (`.github/workflows/ci.yml`)
-
 Se dispara con cada **Pull Request** hacia `develop` o `main` y con cada **push** a esas ramas. Un push a una rama `feature/*` sin PR no lo activa.
 
 | Job | Pasos |
@@ -349,9 +319,7 @@ Se dispara con cada **Pull Request** hacia `develop` o `main` y con cada **push*
 ## 10. Docker y Nginx
 
 La imagen se construye en dos etapas (`Dockerfile`):
-
 1. **Compilación:** `node:22-alpine` ejecuta `npm ci` y `npm run build`, que produce `dist/`.
-
 2. **Ejecución:** `nginxinc/nginx-unprivileged:alpine` sirve `dist/` por el puerto interno **8080**, sin privilegios de administrador.
 
 | Ruta en Nginx | Comportamiento |
