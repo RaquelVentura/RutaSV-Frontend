@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import api from '../../config/axios';
 
 export default function Login() {
   const [errors, setErrors] = useState({});
@@ -19,7 +20,7 @@ export default function Login() {
     return '';
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
 
     const form = event.currentTarget;
@@ -35,9 +36,22 @@ export default function Login() {
       return;
     }
 
-    setNotice(
-      'El inicio de sesión requiere conectar el backend. No se inició ninguna sesión.',
-    );
+    try {
+      const response = await api.post('/auth/login', {
+        email: form.elements.email.value,
+        password: form.elements.password.value,
+      });
+
+      const loginData = response.data;
+      
+      localStorage.setItem('token', loginData.token);
+
+      // Retorna al inicio "/" de la app
+      window.location.href = '/';
+    } catch (error) {
+      console.error('Login failed:', error);
+      setNotice('Error al iniciar sesión. Por favor, verifica tus credenciales.');
+    }
   }
 
   function handleChange(event) {
