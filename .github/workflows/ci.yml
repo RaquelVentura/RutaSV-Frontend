@@ -6,8 +6,13 @@ on:
   pull_request:
     branches: [develop, main]
 
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
 permissions:
   contents: read
+  packages: write # Permite subir imágenes a GitHub Container Registry
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -26,7 +31,8 @@ jobs:
           cache: npm
 
       - run: npm ci
-      - run: npm run lint
+      - name: Ejecución de linter
+        run: npm run lint
       - run: npm test
       - run: npm run build
 
@@ -35,23 +41,46 @@ jobs:
     needs: build-test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
 
-      - uses: docker/setup-buildx-action@v3
+      - name: Iniciar sesión en GitHub Container Registry (GHCR)
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: docker/build-push-action@v6
+      - name: Generar tags y metadatos para la imagen Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
+            type=sha,prefix=sha-
+
+      - name: Construir y publicar imagen Docker en GitHub Packages
+        uses: docker/build-push-action@v6
         with:
           context: .
-          load: true
-          tags: rutasv-frontend:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
 
-      - name: Smoke test del contenedor
+      # Smoke test del contenedor, obtiene el segundo tag generado y lo usa para levantar un contenedor y hacer un par de requests
+      - name: Smoke test del contenedor 
+        env:
+          IMAGE: ${{ steps.meta.outputs.tags }}
         run: |
-          docker run -d --name frontend -p 8080:8080 rutasv-frontend:ci
+          IMAGE="$(printf '%s\n' "$IMAGE" | sed -n '2p')"
+          echo "Usando imagen: $IMAGE"
+          docker pull "$IMAGE"
+          docker run -d --name frontend -p 8080:8080 "$IMAGE"
           for i in $(seq 1 15); do
-            curl -fsS http://localhost:8080/ >/dev/null && break
+            if curl -fsS http://localhost:8080/ >/dev/null; then
+              break
+            fi
             sleep 2
           done
           curl -fsS http://localhost:8080/ | grep -q '<div id="root">'

@@ -23,19 +23,12 @@ Este documento reúne todo lo que necesitas para trabajar en la interfaz de **Ru
 ## 2. Qué necesitas instalado
 
 1. **Git** — [git-scm.com](https://git-scm.com/).
-
 2. **Node 22 o superior** — [nodejs.org](https://nodejs.org/). Compruébalo con `node -v`.
-
 3. **VS Code** — [code.visualstudio.com](https://code.visualstudio.com/), con estas extensiones:
-
-   * ESLint (`dbaeumer.vscode-eslint`)
-
-   * Tailwind CSS IntelliSense (`bradlc.vscode-tailwindcss`)
-
-   * *(opcional)* ES7+ React snippets
-
+   * ESLint (`dbaeumer.vscode-eslint`)
+   * Tailwind CSS IntelliSense (`bradlc.vscode-tailwindcss`)
+   * *(opcional)* ES7+ React snippets
 4. **Docker Desktop** — solo si quieres probar la imagen de producción.
-
 5. **El backend en marcha** — cuando toque conectar el front con datos reales (sigue el README de `RutaSV-Backend`).
 
 ---
@@ -50,7 +43,6 @@ cd RutaSV-Fronted
 ```
 
 ### 3.2 Trabaja siempre en tu propia rama
-
 > ⚠️ **Regla del equipo:** no se programa directamente en `main` ni en `develop`. Cada tarea o historia de usuario tiene su rama.
 
 Si la rama ya existe en GitHub:
@@ -70,6 +62,19 @@ git checkout -b feature/HU-02-descripcion-corta
 ```
 
 ### 3.3 Instala las librerías
+```bash
+npm install
+```
+Crea la carpeta `node_modules`. La primera vez puede tardar un par de minutos.
+
+### 3.4 Crea tu `.env`
+Copia la plantilla incluida en el repo:
+
+```bash
+cp .env.example .env              # Git Bash, Linux o macOS
+```
+```powershell
+Copy-Item .env.example .env       # Windows PowerShell
 
 ```bash
 npm install
@@ -98,13 +103,11 @@ Copy-Item .env.example .env       # Windows PowerShell
 Este archivo está en `.gitignore`, así que tus valores no se suben a GitHub.
 
 ### 3.5 Arranca la app
-
 ```bash
 npm run dev
 ```
 
 Abre **http://localhost:5173** (o la dirección que imprima la consola). Edita cualquier archivo de `src/`, guarda con `Ctrl + S` y verás el cambio al instante. Para detenerla: `Ctrl + C`.
-
 ---
 
 ## 4. Dos formas de trabajar
@@ -112,10 +115,9 @@ Abre **http://localhost:5173** (o la dirección que imprima la consola). Edita c
 **A. En tu equipo, con `npm run dev` (la de todos los días).** Es la más rápida: recarga al guardar. Hoy el front aún no consume el backend, así que no necesitas tenerlo encendido.
 
 **B. Imagen de producción.** Para comprobar lo que realmente se despliega:
-
 ```bash
-docker compose up --build     # abre http://localhost:5173
-docker compose down           # para apagarlo
+docker compose up --build     # abre http://localhost:5173
+docker compose down           # para apagarlo
 ```
 
 ---
@@ -124,38 +126,38 @@ docker compose down           # para apagarlo
 
 ```
 RutaSV-Fronted/
-├── index.html                  Página única con <div id="root">
-├── package.json                Dependencias y scripts
-├── vite.config.js              Plugins (React, Tailwind), proxy /api y config de pruebas
-├── eslint.config.js            Reglas del linter
-├── .editorconfig               Formato: UTF-8, LF, 2 espacios
-├── .env / .env.example         Ajustes locales (.env no se sube)
-├── .nvmrc                      Versión de Node (22)
-├── Dockerfile                  Compila y sirve con Nginx
-├── docker-compose.yml          Levanta solo el front
-├── nginx.conf.template         Nginx: SPA + proxy /api
-├── .github/workflows/ci.yml    Integración continua
-├── public/                     Archivos estáticos (favicon.svg)
-├── dist/                       Resultado del build (se genera solo)
-└── src/                        ← aquí se trabaja
-    ├── main.jsx                Punto de entrada: monta <App /> dentro de <BrowserRouter>
-    ├── App.jsx                 Rutas de la aplicación y estado del usuario
-    ├── App.test.jsx            Pruebas de las rutas
-    ├── index.css               Importa Tailwind
-    ├── layouts/
-    │   ├── AppLayout.jsx       Barra superior (logo, iniciar sesión / registro / cerrar sesión) y contenedor
-    │   └── AppLayout.test.jsx
-    ├── pages/                  Una pantalla por archivo
-    │   ├── Home.jsx            Portada
-    │   ├── NotFound.jsx        Página 404
-    │   └── Auth/
-    │       ├── Login.jsx / Login.test.jsx   Inicio de sesión
-    │       ├── Registration.jsx             Registro
-    │       ├── EmailVerification.jsx        Ingreso del código de 6 dígitos
-    │       └── VerificationResult.jsx       Resultado: aceptada o rechazada
-    ├── lib/
-    │   └── api.js              apiFetch: función base para hablar con el backend
-    └── test/setup.js           Preparación de las pruebas (jest-dom)
+├── index.html                  Página única con <div id="root">
+├── package.json                Dependencias y scripts
+├── vite.config.js              Plugins (React, Tailwind), proxy /api y config de pruebas
+├── eslint.config.js            Reglas del linter
+├── .editorconfig               Formato: UTF-8, LF, 2 espacios
+├── .env / .env.example         Ajustes locales (.env no se sube)
+├── .nvmrc                      Versión de Node (22)
+├── Dockerfile                  Compila y sirve con Nginx
+├── docker-compose.yml          Levanta solo el front
+├── nginx.conf.template         Nginx: SPA + proxy /api
+├── .github/workflows/ci.yml    Integración continua
+├── public/                     Archivos estáticos (favicon.svg)
+├── dist/                       Resultado del build (se genera solo)
+└── src/                        ← aquí se trabaja
+    ├── main.jsx                Punto de entrada: monta <App /> dentro de <BrowserRouter>
+    ├── App.jsx                 Rutas de la aplicación y estado del usuario
+    ├── App.test.jsx            Pruebas de las rutas
+    ├── index.css               Importa Tailwind
+    ├── layouts/
+    │   ├── AppLayout.jsx       Barra superior (logo, iniciar sesión / registro / cerrar sesión) y contenedor
+    │   └── AppLayout.test.jsx
+    ├── pages/                  Una pantalla por archivo
+    │   ├── Home.jsx            Portada
+    │   ├── NotFound.jsx        Página 404
+    │   └── Auth/
+    │       ├── Login.jsx / Login.test.jsx   Inicio de sesión
+    │       ├── Registration.jsx             Registro
+    │       ├── EmailVerification.jsx        Ingreso del código de 6 dígitos
+    │       └── VerificationResult.jsx       Resultado: aceptada o rechazada
+    ├── lib/
+    │   └── api.js              apiFetch: función base para hablar con el backend
+    └── test/setup.js           Preparación de las pruebas (jest-dom)
 ```
 
 ### ¿Dónde pongo mi código?
@@ -194,10 +196,10 @@ Si ya tienes una vista hecha con HTML y CSS, esta es la equivalencia:
 
 ```mermaid
 flowchart LR
-    U[Navegador] -->|"páginas y /assets/*"| F["Frontend<br/>(Vite en dev · Nginx en prod)"]
-    U -->|"/api/*"| F
-    F -->|proxy /api| A["API .NET<br/>RutaSV-Backend"]
-    A --> P[(PostgreSQL)]
+    U[Navegador] -->|"páginas y /assets/*"| F["Frontend<br/>(Vite en dev · Nginx en prod)"]
+    U -->|"/api/*"| F
+    F -->|proxy /api| A["API .NET<br/>RutaSV-Backend"]
+    A --> P[(PostgreSQL)]
 ```
 
 El navegador solo conversa con el frontend; este sirve la aplicación y reenvía `/api/*` al backend.
@@ -206,12 +208,12 @@ El navegador solo conversa con el frontend; este sirve la aplicación y reenvía
 
 ```mermaid
 flowchart TD
-    M[main.jsx] --> BR[BrowserRouter]
-    BR --> APP[App.jsx<br/>estado del usuario + rutas]
-    APP --> L[AppLayout<br/>barra superior]
-    L --> R{Route según la URL}
-    R --> PAGE[Página en src/pages]
-    PAGE -.-> LIB[lib/api.js → backend<br/>aún sin conectar]
+    M[main.jsx] --> BR[BrowserRouter]
+    BR --> APP[App.jsx<br/>estado del usuario + rutas]
+    APP --> L[AppLayout<br/>barra superior]
+    L --> R{Route según la URL}
+    R --> PAGE[Página en src/pages]
+    PAGE -.-> LIB[lib/api.js → backend<br/>aún sin conectar]
 ```
 
 ### 6.3 Rutas actuales (`src/App.jsx`)
