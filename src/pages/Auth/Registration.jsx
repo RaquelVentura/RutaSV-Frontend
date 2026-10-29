@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { GoogleLogin } from '@react-oauth/google'
 import api from '../../config/axios'
 import { useAuth } from '../../context/AuthContext.jsx'
 
@@ -112,6 +113,38 @@ export default function Registration() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  async function handleGoogleSuccess(credentialResponse) {
+    const { credential } = credentialResponse || {}
+
+    if (!credential) {
+      setApiError('No se pudo obtener la credencial de Google.')
+      return
+    }
+
+    setApiError('')
+    setIsLoading(true)
+
+    try {
+      const response = await api.post('/auth/google', {
+        idToken: credential,
+      })
+
+      const token =
+        typeof response.data === 'string' ? response.data : response.data?.token
+
+      login(token)
+      navigate('/')
+    } catch (error) {
+      setApiError(getApiErrorMessage(error))
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  function handleGoogleError() {
+    setApiError('No se pudo completar el registro con Google. Inténtalo de nuevo.')
   }
 
   function handleChange(event) {
@@ -299,6 +332,22 @@ export default function Registration() {
         >
           {isLoading ? 'Creando cuenta...' : 'Crear cuenta'}
         </button>
+
+        <div className="relative my-4 flex items-center justify-center">
+          <div className="w-full border-t border-stone-200" />
+          <span className="bg-white px-3 text-xs uppercase text-stone-400">
+            o
+          </span>
+          <div className="w-full border-t border-stone-200" />
+        </div>
+
+        <div className="flex justify-center">
+          <GoogleLogin
+            text="signup_with"
+            onSuccess={handleGoogleSuccess}
+            onError={handleGoogleError}
+          />
+        </div>
       </form>
     </section>
   )
