@@ -12,6 +12,30 @@ vi.mock('../../config/axios', () => ({
   },
 }))
 
+vi.mock('@react-oauth/google', () => {
+  function GoogleOAuthProvider({ children }) {
+    return children
+  }
+
+  function GoogleLogin({ onSuccess, onError }) {
+    return (
+      <div>
+        <button
+          type="button"
+          onClick={() => onSuccess({ credential: 'google-register-token-123' })}
+        >
+          Registrarse con Google
+        </button>
+        <button type="button" onClick={() => onError()}>
+          Error Google Registro
+        </button>
+      </div>
+    )
+  }
+
+  return { GoogleOAuthProvider, GoogleLogin }
+})
+
 function createMockJwt(payload) {
   const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
   const jsonPayload = JSON.stringify(payload)
@@ -142,5 +166,32 @@ describe('Registration', () => {
         'El correo electrónico ya está registrado.',
       )
     })
+  })
+
+  it('permite registrarse o iniciar sesión con Google enviando { idToken: credential } a /auth/google', async () => {
+    const token = createMockJwt({
+      sub: 'ec25601c-d3fb-41ff-a022-2b143afade36',
+      email: 'evervc.dev@gmail.com',
+      given_name: 'Ever',
+      family_name: 'Vásquez',
+      'http://schemas.microsoft.com/ws/2008/06/identity/claims/role': 'VISITANTE',
+      exp: 4102444800,
+    })
+
+    api.post.mockResolvedValueOnce({ data: { token } })
+
+    renderRegistration()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Registrarse con Google' }))
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith('/auth/google', {
+        idToken: 'google-register-token-123',
+      })
+      expect(
+        screen.getByRole('heading', { name: /qué bueno verte, ever vásquez/i }),
+      ).toBeInTheDocument()
+    })
+    expect(localStorage.getItem('token')).toBe(token)
   })
 })
