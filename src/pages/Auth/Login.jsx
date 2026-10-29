@@ -1,10 +1,13 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import api from '../../config/axios';
+import { useAuth } from '../../context/AuthContext.jsx';
 
 export default function Login() {
   const [errors, setErrors] = useState({});
   const [notice, setNotice] = useState('');
+  const { login } = useAuth();
+  const navigate = useNavigate();
 
   function getFieldError(input) {
     if (input.validity.valueMissing) {
@@ -43,11 +46,11 @@ export default function Login() {
       });
 
       const loginData = response.data;
-      
-      localStorage.setItem('token', loginData.token);
+
+      login(loginData.token);
 
       // Retorna al inicio "/" de la app
-      window.location.href = '/';
+      navigate('/');
     } catch (error) {
       console.error('Login failed:', error);
       setNotice('Error al iniciar sesión. Por favor, verifica tus credenciales.');
