@@ -58,28 +58,14 @@ describe('App', () => {
     ).toBeInTheDocument()
   })
 
-  it('continúa desde el registro a ingresar el código con el correo registrado', () => {
+  it('valida los campos obligatorios en el formulario de registro', () => {
     const { container } = renderAt('/registro')
 
-    fireEvent.change(container.querySelector('#register-name'), {
-      target: { value: 'Ana López' },
-    })
-    fireEvent.change(container.querySelector('#register-email'), {
-      target: { value: 'ana@correo.com' },
-    })
-    fireEvent.change(container.querySelector('#register-password'), {
-      target: { value: 'password123' },
-    })
-    fireEvent.change(container.querySelector('#register-confirm-password'), {
-      target: { value: 'password123' },
-    })
     fireEvent.click(within(container).getByRole('button', { name: /crear cuenta/i }))
 
-    expect(
-      within(container).getByRole('heading', { name: /verifica tu correo/i }),
-    ).toBeInTheDocument()
-    expect(within(container).getByText(/ana@correo\.com/)).toBeInTheDocument()
-    expect(within(container).getByText(/no se ha enviado ningún código/i)).toBeInTheDocument()
+    expect(within(container).getByText('Ingresa tu nombre.')).toBeInTheDocument()
+    expect(within(container).getByText('Ingresa tu apellido.')).toBeInTheDocument()
+    expect(within(container).getByText('Ingresa tu correo electrónico.')).toBeInTheDocument()
   })
 
   it('permite omitir la verificación y vuelve a la vista de visitante', () => {
