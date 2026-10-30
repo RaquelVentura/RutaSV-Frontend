@@ -107,7 +107,7 @@ export default function Registration() {
         typeof response.data === 'string' ? response.data : response.data?.token
 
       login(token)
-      navigate('/')
+      navigate('/verify-email')
     } catch (error) {
       setApiError(getApiErrorMessage(error))
     } finally {

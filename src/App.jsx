@@ -21,6 +21,7 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<Login />} />
             <Route path="/registro" element={<Registration />} />
+            <Route path="/verify-email" element={<EmailVerification />} />
             <Route path="/registro/verificar" element={<EmailVerification />} />
             <Route
               path="/registro/verificacion/aceptada"
