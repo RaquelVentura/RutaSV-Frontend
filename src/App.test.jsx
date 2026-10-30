@@ -72,11 +72,7 @@ describe('App', () => {
     const { container } = renderAt('/verify-email?token=abc123token')
 
     expect(
-<<<<<<< HEAD
-      within(container).getByRole('heading', { name: /el salvador se vive/i }),
-=======
       within(container).getByRole('heading', { name: /verifica tu correo/i }),
->>>>>>> 73e41b3f2730ec19eccbc2fd1d93242c2810890d
     ).toBeInTheDocument()
     expect(
       within(container).getByLabelText(/token de verificación/i),

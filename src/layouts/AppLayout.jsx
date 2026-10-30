@@ -1,12 +1,3 @@
-<<<<<<< HEAD
-import Footer from '../components/Footer.jsx'
-import NavBar from '../components/NavBar.jsx'
-import { useAuth } from '../context/AuthContext.jsx'
-
-export default function AppLayout({ user: propUser, onLogout, children }) {
-  const { user: authUser, logout } = useAuth()
-  const user = authUser ?? propUser ?? null
-=======
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
@@ -26,7 +17,6 @@ export default function AppLayout({ user: propUser, onLogout, children }) {
     [currentUser?.firstName, currentUser?.lastName].filter(Boolean).join(' ') ||
     currentUser?.email ||
     'Usuario'
->>>>>>> 73e41b3f2730ec19eccbc2fd1d93242c2810890d
 
   const isEmailVerified =
     currentUser?.emailVerified === true ||
@@ -59,12 +49,6 @@ export default function AppLayout({ user: propUser, onLogout, children }) {
   }
 
   return (
-<<<<<<< HEAD
-    <div className="flex min-h-screen flex-col bg-canvas text-ink">
-      <NavBar user={user} onLogout={onLogout ?? logout} />
-      <main className="flex-1">{children}</main>
-      <Footer />
-=======
     <div className="min-h-screen bg-stone-50 text-stone-900">
       <header className="border-b border-stone-200 bg-white">
         <nav className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
@@ -185,7 +169,6 @@ export default function AppLayout({ user: propUser, onLogout, children }) {
         </nav>
       </header>
       <main className="mx-auto max-w-5xl px-4 py-8">{children}</main>
->>>>>>> 73e41b3f2730ec19eccbc2fd1d93242c2810890d
     </div>
   )
 }
