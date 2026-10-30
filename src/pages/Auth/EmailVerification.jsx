@@ -1,119 +1,38 @@
 import { useState } from 'react'
-import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import api from '../../config/axios'
-import { useAuth } from '../../context/AuthContext.jsx'
-
-function getApiErrorMessage(error, fallbackMessage) {
-  const data = error?.response?.data
-
-  if (!data) {
-    return fallbackMessage
-  }
-
-  if (typeof data === 'string' && data.trim()) {
-    return data
-  }
-
-  if (typeof data.message === 'string' && data.message.trim()) {
-    return data.message
-  }
-
-  if (typeof data.detail === 'string' && data.detail.trim()) {
-    return data.detail
-  }
-
-  if (typeof data.error === 'string' && data.error.trim()) {
-    return data.error
-  }
-
-  if (data.errors && typeof data.errors === 'object') {
-    const messages = Object.values(data.errors).flat().filter(Boolean)
-    if (messages.length > 0) {
-      return messages.join(' ')
-    }
-  }
-
-  if (typeof data.title === 'string' && data.title.trim()) {
-    return data.title
-  }
-
-  return fallbackMessage
-}
+import { Link, Navigate, useLocation } from 'react-router-dom'
 
 export default function EmailVerification() {
-  const [searchParams] = useSearchParams()
   const location = useLocation()
-  const navigate = useNavigate()
-  const { user, markEmailAsVerified } = useAuth()
+  const email = location.state?.email
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState(
+    'El envío del código y su verificación requieren conectar un backend. No se ha enviado ningún código.',
+  )
 
-  const urlToken = searchParams.get('token') ?? ''
-  const [token, setToken] = useState(urlToken)
-  const [isLoading, setIsLoading] = useState(false)
-  const [errorMessage, setErrorMessage] = useState('')
-  const [successMessage, setSuccessMessage] = useState('')
+  if (!email) {
+    return <Navigate to="/registro" replace />
+  }
 
-  const userEmail = user?.email || location.state?.email || ''
-
-  async function handleVerifySubmit(event) {
+  function handleCodeSubmit(event) {
     event.preventDefault()
 
-    const trimmedToken = token.trim()
-    if (!trimmedToken) {
-      setSuccessMessage('')
-      setErrorMessage('Ingresa el token de verificación.')
+    const codeInput = event.currentTarget.elements.code
+    const code = codeInput.value.trim()
+    if (!code) {
+      setError('Ingresa el código de verificación.')
+      codeInput.focus()
+      return
+    }
+    if (!/^\d{6}$/.test(code)) {
+      setError('El código debe tener 6 dígitos.')
+      codeInput.focus()
       return
     }
 
-    setErrorMessage('')
-    setSuccessMessage('')
-    setIsLoading(true)
-
-    try {
-      const response = await api.post('/auth/verify-email', {
-        token: trimmedToken,
-      })
-
-      const message =
-        response?.data?.message || 'Correo electrónico verificado exitosamente.'
-
-      markEmailAsVerified(response?.data?.token)
-      setSuccessMessage(message)
-      navigate('/', { state: { notice: message } })
-    } catch (error) {
-      setErrorMessage(
-        getApiErrorMessage(
-          error,
-          'No se pudo verificar el correo electrónico. Verifica que el token sea válido.',
-        ),
-      )
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  async function handleResendEmail() {
-    setErrorMessage('')
-    setSuccessMessage('')
-    setIsLoading(true)
-
-    try {
-      const payload = userEmail ? { email: userEmail } : {}
-      const response = await api.post('/auth/resend-verification-email', payload)
-
-      const message =
-        response?.data?.message ||
-        'Se ha enviado un nuevo correo de verificación.'
-      setSuccessMessage(message)
-    } catch (error) {
-      setErrorMessage(
-        getApiErrorMessage(
-          error,
-          'No se pudo reenviar el correo de verificación. Inténtalo de nuevo.',
-        ),
-      )
-    } finally {
-      setIsLoading(false)
-    }
+    setError('')
+    setNotice(
+      'El código tiene el formato esperado, pero no puede confirmarse sin conectarlo al backend.',
+    )
   }
 
   return (
@@ -133,85 +52,71 @@ export default function EmailVerification() {
           Verifica tu correo
         </h1>
         <p className="mt-2 text-sm text-stone-600">
-          {userEmail ? (
-            <>
-              Ingresa el token de verificación enviado a{' '}
-              <strong>{userEmail}</strong>.
-            </>
-          ) : (
-            'Ingresa el token de verificación que enviamos a tu correo electrónico.'
-          )}
+          Ingresa el código de verificación para <strong>{email}</strong>.
         </p>
       </div>
 
-      {errorMessage && (
-        <div
-          role="alert"
-          className="mt-6 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-        >
-          {errorMessage}
-        </div>
-      )}
+      <p
+        className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"
+        role="status"
+      >
+        {notice}
+      </p>
 
-      {successMessage && (
-        <div
-          role="status"
-          className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800"
-        >
-          {successMessage}
-        </div>
-      )}
-
-      <form className="mt-6 space-y-4" noValidate onSubmit={handleVerifySubmit}>
+      <form className="mt-6 space-y-4" noValidate onSubmit={handleCodeSubmit}>
         <div>
           <label
-            htmlFor="verification-token"
+            htmlFor="verification-code"
             className="mb-1.5 block text-sm font-medium text-stone-700"
           >
-            Token de verificación
+            Código de verificación
           </label>
           <input
-            id="verification-token"
-            name="token"
+            id="verification-code"
+            name="code"
             type="text"
-            value={token}
-            disabled={isLoading}
-            placeholder="Ingresa o pega tu token de verificación"
-            aria-invalid={Boolean(errorMessage)}
-            onChange={(event) => {
-              setToken(event.target.value)
-              if (errorMessage) {
-                setErrorMessage('')
-              }
-            }}
-            className={`w-full rounded-xl border px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-cyan-700 disabled:bg-stone-100 ${
-              errorMessage ? 'border-red-500' : 'border-stone-200'
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={6}
+            placeholder="123456"
+            aria-invalid={Boolean(error)}
+            aria-describedby={error ? 'verification-code-error' : undefined}
+            onChange={() => setError('')}
+            className={`w-full rounded-xl border px-4 py-3 text-center text-lg tracking-[0.4em] outline-none transition focus:ring-2 focus:ring-cyan-700 ${
+              error ? 'border-red-500' : 'border-stone-200'
             }`}
           />
+          {error && (
+            <p
+              id="verification-code-error"
+              className="mt-1 text-xs text-red-600"
+              role="alert"
+            >
+              {error}
+            </p>
+          )}
         </div>
-
         <button
           type="submit"
-          disabled={isLoading}
-          className="w-full rounded-xl bg-[#087E9A] px-4 py-3 text-sm font-semibold text-white transition hover:bg-cyan-800 disabled:cursor-not-allowed disabled:opacity-60"
+          className="w-full rounded-xl bg-[#087E9A] px-4 py-3 text-sm font-semibold text-white transition hover:bg-cyan-800"
         >
-          {isLoading ? 'Procesando...' : 'Verificar'}
+          Verificar código
         </button>
-
-        <button
-          type="button"
-          disabled={isLoading}
-          onClick={handleResendEmail}
-          className="w-full rounded-xl border border-[#087E9A] bg-white px-4 py-3 text-sm font-semibold text-[#087E9A] transition hover:bg-cyan-50 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          Reenviar correo
-        </button>
-
         <Link
           to="/"
+          state={{
+            notice:
+              'Omitiste la verificación por ahora. El registro y el correo no se guardaron porque falta conectar el backend.',
+          }}
           className="block w-full py-2 text-center text-sm font-medium text-stone-600 hover:text-[#087E9A] hover:underline"
         >
-          Volver al inicio
+          Omitir por ahora
+        </Link>
+        <Link
+          to="/registro"
+          className="block w-full py-2 text-center text-sm font-medium text-[#087E9A] hover:underline"
+        >
+          Volver al registro
         </Link>
       </form>
     </section>

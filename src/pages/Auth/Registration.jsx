@@ -1,70 +1,22 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { GoogleLogin } from '@react-oauth/google'
-import api from '../../config/axios'
-import { useAuth } from '../../context/AuthContext.jsx'
-
-function getApiErrorMessage(error) {
-  const data = error?.response?.data
-
-  if (!data) {
-    return 'Error al registrar la cuenta. Inténtalo de nuevo más tarde.'
-  }
-
-  if (typeof data === 'string') {
-    return data
-  }
-
-  if (typeof data.message === 'string' && data.message.trim()) {
-    return data.message
-  }
-
-  if (typeof data.error === 'string' && data.error.trim()) {
-    return data.error
-  }
-
-  if (typeof data.detail === 'string' && data.detail.trim()) {
-    return data.detail
-  }
-
-  if (data.errors && typeof data.errors === 'object') {
-    const messages = Object.values(data.errors).flat().filter(Boolean)
-    if (messages.length > 0) {
-      return messages.join(' ')
-    }
-  }
-
-  if (typeof data.title === 'string' && data.title.trim()) {
-    return data.title
-  }
-
-  return 'No se pudo completar el registro. Verifica los datos ingresados.'
-}
 
 export default function Registration() {
   const [errors, setErrors] = useState({})
-  const [apiError, setApiError] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
-  const { login } = useAuth()
   const navigate = useNavigate()
 
-  async function handleSubmit(event) {
+  function handleSubmit(event) {
     event.preventDefault()
 
     const form = event.currentTarget
-    const firstName = form.elements.firstName
-    const lastName = form.elements.lastName
+    const name = form.elements.name
     const email = form.elements.email
-    const phone = form.elements.phone
     const password = form.elements.password
     const confirmPassword = form.elements.confirmPassword
     const nextErrors = {}
 
-    if (!firstName.value.trim()) {
-      nextErrors.firstName = 'Ingresa tu nombre.'
-    }
-    if (!lastName.value.trim()) {
-      nextErrors.lastName = 'Ingresa tu apellido.'
+    if (!name.value.trim()) {
+      nextErrors.name = 'Ingresa tu nombre.'
     }
     if (!email.value.trim()) {
       nextErrors.email = 'Ingresa tu correo electrónico.'
@@ -89,71 +41,15 @@ export default function Registration() {
       return
     }
 
-    setApiError('')
-    setIsLoading(true)
-
-    const trimmedPhone = phone.value.trim()
-    const payload = {
-      email: email.value.trim(),
-      password: password.value,
-      firstName: firstName.value.trim(),
-      lastName: lastName.value.trim(),
-      ...(trimmedPhone ? { phone: trimmedPhone } : {}),
-    }
-
-    try {
-      const response = await api.post('/auth/register', payload)
-      const token =
-        typeof response.data === 'string' ? response.data : response.data?.token
-
-      login(token)
-      navigate('/verify-email')
-    } catch (error) {
-      setApiError(getApiErrorMessage(error))
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  async function handleGoogleSuccess(credentialResponse) {
-    const { credential } = credentialResponse || {}
-
-    if (!credential) {
-      setApiError('No se pudo obtener la credencial de Google.')
-      return
-    }
-
-    setApiError('')
-    setIsLoading(true)
-
-    try {
-      const response = await api.post('/auth/google', {
-        idToken: credential,
-      })
-
-      const token =
-        typeof response.data === 'string' ? response.data : response.data?.token
-
-      login(token)
-      navigate('/')
-    } catch (error) {
-      setApiError(getApiErrorMessage(error))
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  function handleGoogleError() {
-    setApiError('No se pudo completar el registro con Google. Inténtalo de nuevo.')
+    navigate('/registro/verificar', {
+      state: { email: email.value.trim() },
+    })
   }
 
   function handleChange(event) {
     const { name } = event.target
     if (errors[name]) {
       setErrors((currentErrors) => ({ ...currentErrors, [name]: '' }))
-    }
-    if (apiError) {
-      setApiError('')
     }
   }
 
@@ -186,60 +82,23 @@ export default function Registration() {
         </p>
       </div>
 
-      {apiError && (
-        <div
-          role="alert"
-          className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-        >
-          {apiError}
-        </div>
-      )}
-
       <form className="space-y-4" noValidate onSubmit={handleSubmit}>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <label htmlFor="register-first-name" className="mb-1.5 block text-xs font-semibold text-stone-700">
-              Nombre
-            </label>
-            <input
-              id="register-first-name"
-              name="firstName"
-              type="text"
-              autoComplete="given-name"
-              required
-              className={fieldClass('firstName')}
-              aria-invalid={Boolean(errors.firstName)}
-              aria-describedby={errors.firstName ? 'register-first-name-error' : undefined}
-              onChange={handleChange}
-            />
-            {errors.firstName && (
-              <p id="register-first-name-error" className="mt-1 text-xs text-red-600" role="alert">
-                {errors.firstName}
-              </p>
-            )}
-          </div>
-
-          <div>
-            <label htmlFor="register-last-name" className="mb-1.5 block text-xs font-semibold text-stone-700">
-              Apellido
-            </label>
-            <input
-              id="register-last-name"
-              name="lastName"
-              type="text"
-              autoComplete="family-name"
-              required
-              className={fieldClass('lastName')}
-              aria-invalid={Boolean(errors.lastName)}
-              aria-describedby={errors.lastName ? 'register-last-name-error' : undefined}
-              onChange={handleChange}
-            />
-            {errors.lastName && (
-              <p id="register-last-name-error" className="mt-1 text-xs text-red-600" role="alert">
-                {errors.lastName}
-              </p>
-            )}
-          </div>
+        <div>
+          <label htmlFor="register-name" className="mb-1.5 block text-xs font-semibold text-stone-700">
+            Nombre completo
+          </label>
+          <input
+            id="register-name"
+            name="name"
+            type="text"
+            autoComplete="name"
+            required
+            className={fieldClass('name')}
+            aria-invalid={Boolean(errors.name)}
+            aria-describedby={errors.name ? 'register-name-error' : undefined}
+            onChange={handleChange}
+          />
+          {errors.name && <p id="register-name-error" className="mt-1 text-xs text-red-600" role="alert">{errors.name}</p>}
         </div>
 
         <div>
@@ -258,26 +117,7 @@ export default function Registration() {
             aria-describedby={errors.email ? 'register-email-error' : undefined}
             onChange={handleChange}
           />
-          {errors.email && (
-            <p id="register-email-error" className="mt-1 text-xs text-red-600" role="alert">
-              {errors.email}
-            </p>
-          )}
-        </div>
-
-        <div>
-          <label htmlFor="register-phone" className="mb-1.5 block text-xs font-semibold text-stone-700">
-            Teléfono <span className="font-normal text-stone-400">(opcional)</span>
-          </label>
-          <input
-            id="register-phone"
-            name="phone"
-            type="tel"
-            autoComplete="tel"
-            placeholder="7000-0000"
-            className={fieldClass('phone')}
-            onChange={handleChange}
-          />
+          {errors.email && <p id="register-email-error" className="mt-1 text-xs text-red-600" role="alert">{errors.email}</p>}
         </div>
 
         <div>
@@ -296,11 +136,7 @@ export default function Registration() {
             aria-describedby={errors.password ? 'register-password-error' : undefined}
             onChange={handleChange}
           />
-          {errors.password && (
-            <p id="register-password-error" className="mt-1 text-xs text-red-600" role="alert">
-              {errors.password}
-            </p>
-          )}
+          {errors.password && <p id="register-password-error" className="mt-1 text-xs text-red-600" role="alert">{errors.password}</p>}
         </div>
 
         <div>
@@ -318,36 +154,15 @@ export default function Registration() {
             aria-describedby={errors.confirmPassword ? 'register-confirm-password-error' : undefined}
             onChange={handleChange}
           />
-          {errors.confirmPassword && (
-            <p id="register-confirm-password-error" className="mt-1 text-xs text-red-600" role="alert">
-              {errors.confirmPassword}
-            </p>
-          )}
+          {errors.confirmPassword && <p id="register-confirm-password-error" className="mt-1 text-xs text-red-600" role="alert">{errors.confirmPassword}</p>}
         </div>
 
         <button
           type="submit"
-          disabled={isLoading}
-          className="w-full rounded-xl bg-[#087E9A] px-4 py-3 text-sm font-semibold text-white transition hover:bg-cyan-800 disabled:cursor-not-allowed disabled:opacity-60"
+          className="w-full rounded-xl bg-[#087E9A] px-4 py-3 text-sm font-semibold text-white transition hover:bg-cyan-800"
         >
-          {isLoading ? 'Creando cuenta...' : 'Crear cuenta'}
+          Crear cuenta
         </button>
-
-        <div className="relative my-4 flex items-center justify-center">
-          <div className="w-full border-t border-stone-200" />
-          <span className="bg-white px-3 text-xs uppercase text-stone-400">
-            o
-          </span>
-          <div className="w-full border-t border-stone-200" />
-        </div>
-
-        <div className="flex justify-center">
-          <GoogleLogin
-            text="signup_with"
-            onSuccess={handleGoogleSuccess}
-            onError={handleGoogleError}
-          />
-        </div>
       </form>
     </section>
   )
