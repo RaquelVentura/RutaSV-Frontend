@@ -6,12 +6,6 @@ import LinkButton from './LinkButton.jsx'
 
 const linkClass = 'text-sm font-medium text-ink hover:text-brand'
 
-function getPublishPath(user) {
-  if (!user) return '/auth/register'
-  if (user.role === Roles.VISITANTE) return '/solicitar-operador'
-  return '/operador/experiencias/nueva'
-}
-
 function NavBar({ user = null, onLogout }) {
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
@@ -71,10 +65,10 @@ function NavBar({ user = null, onLogout }) {
           {user ? (
             <>
               <Link to="/perfil" className={linkClass}>
-                {user.firstName ?? user.name}
+                Hola, {user.name || user.firstName}
               </Link>
               <Button variant="outline" onClick={onLogout}>
-                Salir
+                Cerrar sesión
               </Button>
             </>
           ) : (

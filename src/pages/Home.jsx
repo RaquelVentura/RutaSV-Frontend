@@ -1,4 +1,5 @@
 import { useLocation } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext.jsx'
 import Container from '../components/Container.jsx'
 import CategoriesSection from '../components/home/CategoriesSection.jsx'
 import DestinationsSection from '../components/home/DestinationsSection.jsx'
@@ -13,9 +14,17 @@ import ValuePropsSection from '../components/home/ValuePropsSection.jsx'
 
 function Home() {
   const location = useLocation()
+  const { user } = useAuth()
 
   return (
     <>
+      {user && (
+        <Container className="pt-6">
+          <h2 className="text-xl font-bold text-ink">
+            Qué bueno verte, {user.name}
+          </h2>
+        </Container>
+      )}
       {location.state?.notice && (
         <Container className="pt-6">
           <p

@@ -48,13 +48,13 @@ describe('AppLayout', () => {
     )
 
     expect(screen.getByText('Hola, Juan Perez')).toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: /iniciar sesión/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /^login$/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /registro/i })).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /cerrar sesión/i }))
 
     expect(localStorage.getItem('token')).toBeNull()
-    expect(screen.getByRole('link', { name: /iniciar sesión/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /^login$/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /registro/i })).toBeInTheDocument()
   })
 
