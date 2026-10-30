@@ -1,10 +1,7 @@
 import { Link, useLocation } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext.jsx'
 
-function Home({ user: propUser }) {
+function Home({ user }) {
   const location = useLocation()
-  const { user: authUser } = useAuth()
-  const user = authUser ?? propUser ?? null
 
   return (
     <section>
