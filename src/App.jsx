@@ -21,6 +21,7 @@ function App() {
         <AppLayout>
           <Routes>
             <Route path="/" element={<Home />} />
+<<<<<<< HEAD
             <Route element={<ContainedLayout />}>
               <Route path="/login" element={<Login />} />
               <Route path="/auth/login" element={<Login />} />
@@ -45,6 +46,21 @@ function App() {
               />
               <Route path="*" element={<NotFound />} />
             </Route>
+=======
+            <Route path="/login" element={<Login />} />
+            <Route path="/registro" element={<Registration />} />
+            <Route path="/verify-email" element={<EmailVerification />} />
+            <Route path="/registro/verificar" element={<EmailVerification />} />
+            <Route
+              path="/registro/verificacion/aceptada"
+              element={<VerificationResult accepted />}
+            />
+            <Route
+              path="/registro/verificacion/rechazada"
+              element={<VerificationResult accepted={false} />}
+            />
+            <Route path="*" element={<NotFound />} />
+>>>>>>> 73e41b3f2730ec19eccbc2fd1d93242c2810890d
           </Routes>
         </AppLayout>
       </AuthProvider>

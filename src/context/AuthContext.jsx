@@ -9,6 +9,7 @@ const defaultAuthContext = {
   isAuthenticated: false,
   login: () => {},
   logout: () => {},
+  markEmailAsVerified: () => {},
 }
 
 export const AuthContext = createContext(defaultAuthContext)
@@ -117,14 +118,38 @@ export function AuthProvider({ children }) {
     setUser(null)
   }, [])
 
+  const markEmailAsVerified = useCallback(
+    (newToken) => {
+      if (newToken && typeof newToken === 'string') {
+        const updated = login(newToken)
+        if (updated) {
+          return updated
+        }
+      }
+
+      setUser((currentUser) =>
+        currentUser
+          ? {
+              ...currentUser,
+              emailVerified: true,
+              email_verified: true,
+            }
+          : null,
+      )
+      return null
+    },
+    [login],
+  )
+
   const value = useMemo(
     () => ({
       user,
       isAuthenticated: Boolean(user),
       login,
       logout,
+      markEmailAsVerified,
     }),
-    [user, login, logout],
+    [user, login, logout, markEmailAsVerified],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

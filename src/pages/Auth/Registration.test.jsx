@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import api from '../../config/axios'
 import { AuthProvider } from '../../context/AuthContext.jsx'
 import Home from '../Home.jsx'
+import EmailVerification from './EmailVerification.jsx'
 import Registration from './Registration.jsx'
 
 vi.mock('../../config/axios', () => ({
@@ -55,6 +56,7 @@ function renderRegistration() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/registro" element={<Registration />} />
+          <Route path="/verify-email" element={<EmailVerification />} />
         </Routes>
       </AuthProvider>
     </MemoryRouter>,
@@ -72,7 +74,7 @@ afterEach(() => {
 })
 
 describe('Registration', () => {
-  it('envía el payload a /auth/register, autentica con el token y redirige al inicio', async () => {
+  it('envía el payload a /auth/register, autentica con el token y redirige a /verify-email', async () => {
     const token = createMockJwt({
       sub: 'ec25601c-d3fb-41ff-a022-2b143afade36',
       email: 'ana@correo.com',
@@ -127,7 +129,7 @@ describe('Registration', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole('heading', { name: /qué bueno verte, ana lópez/i }),
+        screen.getByRole('heading', { name: /verifica tu correo/i }),
       ).toBeInTheDocument()
     })
     expect(localStorage.getItem('token')).toBe(token)
