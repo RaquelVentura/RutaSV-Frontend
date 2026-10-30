@@ -1,10 +1,18 @@
-import { Link, useLocation } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext.jsx'
+import { useLocation } from 'react-router-dom'
+import Container from '../components/Container.jsx'
+import CategoriesSection from '../components/home/CategoriesSection.jsx'
+import DestinationsSection from '../components/home/DestinationsSection.jsx'
+import EditorialBanner from '../components/home/EditorialBanner.jsx'
+import FeaturedExperiencesSection from '../components/home/FeaturedExperiencesSection.jsx'
+import HeroSection from '../components/home/HeroSection.jsx'
+import NewsletterSection from '../components/home/NewsletterSection.jsx'
+import OperatorCta from '../components/home/OperatorCta.jsx'
+import StepsSection from '../components/home/StepsSection.jsx'
+import TestimonialsSection from '../components/home/TestimonialsSection.jsx'
+import ValuePropsSection from '../components/home/ValuePropsSection.jsx'
 
-function Home({ user: propUser }) {
+function Home() {
   const location = useLocation()
-  const { user: authUser } = useAuth()
-  const user = authUser ?? propUser ?? null
 
   return (
     <>
