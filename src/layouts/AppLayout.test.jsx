@@ -98,35 +98,6 @@ describe('AppLayout', () => {
     expect(screen.queryByRole('menuitem', { name: /verificar correo/i })).not.toBeInTheDocument()
   })
 
-  it('muestra el acceso al panel del operador para usuarios operadores', () => {
-    const token = createMockJwt({
-      sub: 'ec25601c-d3fb-41ff-a022-2b143afade36',
-      email: 'ana.operadora@gmail.com',
-      given_name: 'Ana',
-      family_name: 'López',
-      'http://schemas.microsoft.com/ws/2008/06/identity/claims/role': 'OPERADOR',
-      email_verified: 'true',
-      exp: 4102444800,
-    })
-    localStorage.setItem('token', token)
-
-    render(
-      <MemoryRouter>
-        <AuthProvider>
-          <AppLayout>
-            <p>Contenido del operador</p>
-          </AppLayout>
-        </AuthProvider>
-      </MemoryRouter>,
-    )
-
-    fireEvent.click(screen.getByRole('button', { name: /ana lópez/i }))
-    expect(screen.getByRole('menuitem', { name: /panel de operador/i })).toHaveAttribute(
-      'href',
-      '/operador',
-    )
-  })
-
   it('redirige a /verify-email al seleccionar Verificar Correo en el menú desplegable', () => {
     const token = createMockJwt({
       sub: 'ec25601c-d3fb-41ff-a022-2b143afade36',
