@@ -14,9 +14,9 @@ describe('AppLayout', () => {
       </MemoryRouter>,
     )
 
-    expect(screen.getByText('Hola, Ana')).toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: /registro/i })).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /cerrar sesión/i }))
+    expect(screen.getByRole('link', { name: 'Ana' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /^registro$/i })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /salir/i }))
     expect(onLogout).toHaveBeenCalledOnce()
   })
 
@@ -29,7 +29,19 @@ describe('AppLayout', () => {
       </MemoryRouter>,
     )
 
-    expect(screen.getByRole('link', { name: /iniciar sesión/i })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /registro/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /^login$/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /^registro$/i })).toBeInTheDocument()
+  })
+
+  it('incluye el pie de página', () => {
+    render(
+      <MemoryRouter>
+        <AppLayout user={null}>
+          <p>Contenido</p>
+        </AppLayout>
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByText(/hecho en el salvador/i)).toBeInTheDocument()
   })
 })

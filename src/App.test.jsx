@@ -17,7 +17,7 @@ describe('App', () => {
   it('muestra la portada en /', () => {
     renderAt('/')
     expect(
-      screen.getByRole('heading', { name: /descubre el salvador/i }),
+      screen.getByRole('heading', { name: /el salvador se vive/i }),
     ).toBeInTheDocument()
   })
 
@@ -99,7 +99,7 @@ describe('App', () => {
     fireEvent.click(within(container).getByRole('link', { name: /omitir por ahora/i }))
 
     expect(
-      within(container).getByRole('heading', { name: /descubre el salvador/i }),
+      within(container).getByRole('heading', { name: /el salvador se vive/i }),
     ).toBeInTheDocument()
     expect(within(container).getByRole('status')).toHaveTextContent(
       /no se guardaron porque falta conectar el backend/i,

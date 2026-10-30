@@ -64,23 +64,6 @@ export default function Login() {
           </button>
         </div>
 
-        {/* Barra de búsqueda */}
-        <div className="relative mb-6">
-          <span className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-gray-400">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4">
-  <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-</svg>
-
-          </span>
-          <input
-            type="text"
-            placeholder="¿A dónde quieres ir?"
-            className="w-full pl-10 pr-4 py-3 bg-gray-50/80 border border-gray-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-cyan-600 focus:bg-white transition"
-          />
-        </div>
-
-        <hr className="border-gray-100 mb-8" />
-
         {/* Sección de Bienvenida */}
         <div className="text-center mb-8">
           <span className="text-[11px] font-bold tracking-wider text-cyan-700 uppercase">

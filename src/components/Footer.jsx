@@ -62,7 +62,7 @@ function Footer() {
         </div>
         <div className="mt-10 flex flex-wrap justify-between gap-3 border-t border-white/15 pt-6 text-xs text-white/70">
           <p>© {new Date().getFullYear()} RutaSV · Hecho en El Salvador</p>
-          <p>Privacidad · Términos</p>
+          <p>Privacidad · Términos · ES / EN · USD</p>
         </div>
       </div>
     </footer>

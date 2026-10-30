@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useAuth } from '../lib/auth/useAuth.js'
 import { Roles } from '../lib/roles.js'
 import Button from './Button.jsx'
 import LinkButton from './LinkButton.jsx'
@@ -13,8 +12,7 @@ function getPublishPath(user) {
   return '/operador/experiencias/nueva'
 }
 
-function NavBar() {
-  const { user, logout } = useAuth()
+function NavBar({ user = null, onLogout }) {
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
 
@@ -46,10 +44,6 @@ function NavBar() {
           <Link to="/experiencias" className={linkClass}>
             Explorar
           </Link>
-          <Link to={getPublishPath(user)} className={linkClass}>
-            Publicar experiencia
-          </Link>
-
           {user?.role === Roles.VISITANTE && (
             <>
               <Link to="/mis-reservas" className={linkClass}>
@@ -73,12 +67,13 @@ function NavBar() {
         </div>
 
         <div className="flex items-center gap-3">
+          <span className="hidden text-xs font-semibold text-brand lg:inline">ES / EN ▾</span>
           {user ? (
             <>
               <Link to="/perfil" className={linkClass}>
-                {user.firstName}
+                {user.firstName ?? user.name}
               </Link>
-              <Button variant="outline" onClick={logout}>
+              <Button variant="outline" onClick={onLogout}>
                 Salir
               </Button>
             </>
