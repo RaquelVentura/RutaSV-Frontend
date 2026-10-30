@@ -68,36 +68,15 @@ describe('App', () => {
     expect(within(container).getByText('Ingresa tu correo electrónico.')).toBeInTheDocument()
   })
 
-  it('permite omitir la verificación y vuelve a la vista de visitante', () => {
-    const { container } = render(
-      <MemoryRouter
-        initialEntries={[
-          {
-            pathname: '/registro/verificar',
-            state: { email: 'ana@correo.com' },
-          },
-        ]}
-      >
-        <App />
-      </MemoryRouter>,
-    )
-
-    fireEvent.click(within(container).getByRole('link', { name: /omitir por ahora/i }))
+  it('renderiza la vista de verificación en /verify-email y autorrellena el token desde ?token=', () => {
+    const { container } = renderAt('/verify-email?token=abc123token')
 
     expect(
-      within(container).getByRole('heading', { name: /descubre el salvador/i }),
+      within(container).getByRole('heading', { name: /verifica tu correo/i }),
     ).toBeInTheDocument()
-    expect(within(container).getByRole('status')).toHaveTextContent(
-      /no se guardaron porque falta conectar el backend/i,
-    )
-  })
-
-  it('redirige al registro si se abre verificación sin venir del registro', () => {
-    const { container } = renderAt('/registro/verificar')
-
     expect(
-      within(container).getByRole('heading', { name: /crea tu cuenta/i }),
-    ).toBeInTheDocument()
+      within(container).getByLabelText(/token de verificación/i),
+    ).toHaveValue('abc123token')
   })
 
   it('muestra resultados de verificación aceptada y rechazada', () => {
