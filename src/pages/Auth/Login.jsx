@@ -1,9 +1,14 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { GoogleLogin } from '@react-oauth/google';
+import api from '../../config/axios';
+import { useAuth } from '../../context/AuthContext.jsx';
 
 export default function Login() {
   const [errors, setErrors] = useState({});
   const [notice, setNotice] = useState('');
+  const { login } = useAuth();
+  const navigate = useNavigate();
 
   function getFieldError(input) {
     if (input.validity.valueMissing) {
@@ -19,7 +24,7 @@ export default function Login() {
     return '';
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
 
     const form = event.currentTarget;
@@ -35,9 +40,61 @@ export default function Login() {
       return;
     }
 
-    setNotice(
-      'El inicio de sesión requiere conectar el backend. No se inició ninguna sesión.',
-    );
+    try {
+      const response = await api.post('/auth/login', {
+        email: form.elements.email.value,
+        password: form.elements.password.value,
+      });
+
+      const loginData = response.data;
+
+      login(loginData.token);
+
+      // Retorna al inicio "/" de la app
+      navigate('/');
+    } catch (error) {
+      console.error('Login failed:', error);
+      setNotice('Error al iniciar sesión. Por favor, verifica tus credenciales.');
+    }
+  }
+
+  async function handleGoogleSuccess(credentialResponse) {
+    const { credential } = credentialResponse || {};
+
+    if (!credential) {
+      setNotice('No se pudo obtener la credencial de Google.');
+      return;
+    }
+
+    try {
+      setNotice('');
+      const response = await api.post('/auth/google', {
+        idToken: credential,
+      });
+
+      const token =
+        typeof response.data === 'string'
+          ? response.data
+          : response.data?.token;
+
+      login(token);
+      navigate('/');
+    } catch (error) {
+      console.error('Google login failed:', error);
+      const backendMessage =
+        typeof error?.response?.data === 'string'
+          ? error.response.data
+          : error?.response?.data?.message || error?.response?.data?.error;
+
+      setNotice(
+        backendMessage ||
+          'Error al iniciar sesión con Google. Inténtalo de nuevo.',
+      );
+    }
+  }
+
+  function handleGoogleError() {
+    setNotice('No se pudo iniciar sesión con Google. Inténtalo de nuevo.');
   }
 
   function handleChange(event) {
@@ -67,10 +124,9 @@ export default function Login() {
         {/* Barra de búsqueda */}
         <div className="relative mb-6">
           <span className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-gray-400">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4">
-  <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-</svg>
-
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-4">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+            </svg>
           </span>
           <input
             type="text"
@@ -171,6 +227,21 @@ export default function Login() {
           >
             Iniciar sesión
           </button>
+
+          <div className="relative my-4 flex items-center justify-center">
+            <div className="w-full border-t border-gray-200" />
+            <span className="bg-white px-3 text-xs uppercase text-gray-400">
+              o
+            </span>
+            <div className="w-full border-t border-gray-200" />
+          </div>
+
+          <div className="flex justify-center">
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={handleGoogleError}
+            />
+          </div>
 
           <div className="text-center pt-3">
             <span className="text-xs text-gray-500">¿Aún no tienes cuenta? </span>

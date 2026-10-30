@@ -1,6 +1,19 @@
 import { Link } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext.jsx'
 
-export default function AppLayout({ user, onLogout, children }) {
+export default function AppLayout({ user: propUser, onLogout, children }) {
+  const { user: authUser, isAuthenticated: authIsAuthenticated, logout } = useAuth()
+  const currentUser = authUser ?? propUser ?? null
+  const isAuthenticated = authIsAuthenticated || Boolean(propUser)
+  const handleLogout = onLogout ?? logout
+
+  const displayName =
+    currentUser?.name ||
+    [currentUser?.given_name, currentUser?.family_name].filter(Boolean).join(' ') ||
+    [currentUser?.firstName, currentUser?.lastName].filter(Boolean).join(' ') ||
+    currentUser?.email ||
+    'Usuario'
+
   return (
     <div className="min-h-screen bg-stone-50 text-stone-900">
       <header className="border-b border-stone-200 bg-white">
@@ -8,14 +21,17 @@ export default function AppLayout({ user, onLogout, children }) {
           <Link to="/" className="text-xl font-bold text-[#087E9A]">
             RutaSV
           </Link>
-          {user ? (
-            <div className="flex items-center gap-4">
+          {isAuthenticated ? (
+            <div
+              aria-label="Menú de perfil"
+              className="flex items-center gap-4"
+            >
               <span className="text-sm text-stone-600">
-                Hola, {user.name}
+                Hola, {displayName}
               </span>
               <button
                 type="button"
-                onClick={onLogout}
+                onClick={handleLogout}
                 className="rounded-full border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
               >
                 Cerrar sesión
