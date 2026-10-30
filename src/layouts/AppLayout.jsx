@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
+import { Roles } from '../lib/roles.js'
 
 export default function AppLayout({ user: propUser, onLogout, children }) {
   const { user: authUser, isAuthenticated: authIsAuthenticated, logout } = useAuth()
@@ -125,6 +126,17 @@ export default function AppLayout({ user: propUser, onLogout, children }) {
                   >
                     Solicitud de Operador
                   </Link>
+                  {(currentUser?.role === Roles.OPERADOR ||
+                    currentUser?.role === Roles.ADMIN) && (
+                    <Link
+                      to="/operador"
+                      role="menuitem"
+                      onClick={closeMenu}
+                      className="block px-4 py-2.5 text-sm text-stone-700 hover:bg-stone-50 hover:text-[#087E9A]"
+                    >
+                      Panel de operador
+                    </Link>
+                  )}
                   {!isEmailVerified && (
                     <Link
                       to="/verify-email"
