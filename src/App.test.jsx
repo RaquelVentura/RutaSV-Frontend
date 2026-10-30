@@ -17,7 +17,7 @@ describe('App', () => {
   it('muestra la portada en /', () => {
     renderAt('/')
     expect(
-      screen.getByRole('heading', { name: /descubre el salvador/i }),
+      screen.getByRole('heading', { name: /el salvador se vive/i }),
     ).toBeInTheDocument()
   })
 

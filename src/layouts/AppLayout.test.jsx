@@ -65,7 +65,7 @@ describe('AppLayout', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: /cerrar sesión/i }))
 
     expect(localStorage.getItem('token')).toBeNull()
-    expect(screen.getByRole('link', { name: /iniciar sesión/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /^iniciar sesión$/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /registro/i })).toBeInTheDocument()
   })
 
@@ -139,7 +139,23 @@ describe('AppLayout', () => {
       </MemoryRouter>,
     )
 
-    expect(screen.getByRole('link', { name: /iniciar sesión/i })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /registro/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /^iniciar sesión$/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /^registro$/i })).toBeInTheDocument()
+  })
+
+  it('muestra el contenido dentro del área principal', () => {
+    render(
+      <MemoryRouter>
+        <AuthProvider>
+          <AppLayout>
+            <p>Contenido de la página</p>
+          </AppLayout>
+        </AuthProvider>
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByRole('main')).toContainElement(
+      screen.getByText('Contenido de la página'),
+    )
   })
 })
