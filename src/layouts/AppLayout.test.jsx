@@ -48,14 +48,9 @@ describe('AppLayout', () => {
       </MemoryRouter>,
     )
 
-<<<<<<< HEAD
-    expect(screen.getByText('Hola, Juan Perez')).toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: /^login$/i })).not.toBeInTheDocument()
-=======
     const menuTrigger = screen.getByRole('button', { name: /juan perez/i })
     expect(menuTrigger).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /iniciar sesión/i })).not.toBeInTheDocument()
->>>>>>> 73e41b3f2730ec19eccbc2fd1d93242c2810890d
     expect(screen.queryByRole('link', { name: /registro/i })).not.toBeInTheDocument()
 
     fireEvent.click(menuTrigger)
