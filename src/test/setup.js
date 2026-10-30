@@ -1,21 +1,37 @@
 import '@testing-library/jest-dom/vitest'
-import { cleanup } from '@testing-library/react'
-import { afterEach, beforeEach, vi } from 'vitest'
 
 function createMemoryStorage() {
-  const items = new Map()
+  const store = new Map()
   return {
-    getItem: (key) => (items.has(key) ? items.get(key) : null),
-    setItem: (key, value) => items.set(key, String(value)),
-    removeItem: (key) => items.delete(key),
-    clear: () => items.clear(),
+    getItem: (key) => (store.has(String(key)) ? store.get(String(key)) : null),
+    setItem: (key, value) => {
+      store.set(String(key), String(value))
+    },
+    removeItem: (key) => {
+      store.delete(String(key))
+    },
+    clear: () => {
+      store.clear()
+    },
+    key: (index) => Array.from(store.keys())[index] ?? null,
+    get length() {
+      return store.size
+    },
   }
 }
 
-beforeEach(() => {
-  vi.stubGlobal('localStorage', createMemoryStorage())
+const storage = createMemoryStorage()
+
+Object.defineProperty(globalThis, 'localStorage', {
+  value: storage,
+  configurable: true,
+  writable: true,
 })
 
-afterEach(() => {
-  cleanup()
-})
+if (typeof window !== 'undefined') {
+  Object.defineProperty(window, 'localStorage', {
+    value: storage,
+    configurable: true,
+    writable: true,
+  })
+}
