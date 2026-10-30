@@ -65,7 +65,7 @@ describe('AppLayout', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: /cerrar sesión/i }))
 
     expect(localStorage.getItem('token')).toBeNull()
-    expect(screen.getByRole('link', { name: /^login$/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /^iniciar sesión$/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /registro/i })).toBeInTheDocument()
   })
 
@@ -139,19 +139,23 @@ describe('AppLayout', () => {
       </MemoryRouter>,
     )
 
-    expect(screen.getByRole('link', { name: /^login$/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /^iniciar sesión$/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /^registro$/i })).toBeInTheDocument()
   })
 
-  it('incluye el pie de página', () => {
+  it('muestra el contenido dentro del área principal', () => {
     render(
       <MemoryRouter>
-        <AppLayout user={null}>
-          <p>Contenido</p>
-        </AppLayout>
+        <AuthProvider>
+          <AppLayout>
+            <p>Contenido de la página</p>
+          </AppLayout>
+        </AuthProvider>
       </MemoryRouter>,
     )
 
-    expect(screen.getByText(/hecho en el salvador/i)).toBeInTheDocument()
+    expect(screen.getByRole('main')).toContainElement(
+      screen.getByText('Contenido de la página'),
+    )
   })
 })
