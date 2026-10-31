@@ -125,6 +125,17 @@ export default function AppLayout({ user: propUser, onLogout, children }) {
                   >
                     Solicitud de Operador
                   </Link>
+                  {(currentUser?.role === 'OPERADOR' ||
+                    currentUser?.role === 'ADMIN') && (
+                    <Link
+                      to="/operador"
+                      role="menuitem"
+                      onClick={closeMenu}
+                      className="block px-4 py-2.5 text-sm text-stone-700 hover:bg-stone-50 hover:text-[#087E9A]"
+                    >
+                      Panel de operador
+                    </Link>
+                  )}
                   {!isEmailVerified && (
                     <Link
                       to="/verify-email"
