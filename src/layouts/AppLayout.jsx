@@ -1,9 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, Outlet } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 
 export default function AppLayout({ user: propUser, onLogout, children }) {
-  const { user: authUser, isAuthenticated: authIsAuthenticated, logout } = useAuth()
+  const {
+    user: authUser,
+    isAuthenticated: authIsAuthenticated,
+    logout,
+    refreshSession,
+  } = useAuth()
   const currentUser = authUser ?? propUser ?? null
   const isAuthenticated = authIsAuthenticated || Boolean(propUser)
   const handleLogout = onLogout ?? logout
@@ -65,7 +70,15 @@ export default function AppLayout({ user: propUser, onLogout, children }) {
                 type="button"
                 aria-expanded={isMenuOpen}
                 aria-haspopup="menu"
-                onClick={() => setIsMenuOpen((open) => !open)}
+                onClick={() => {
+                  setIsMenuOpen((open) => {
+                    const nextOpen = !open
+                    if (nextOpen) {
+                      refreshSession?.()
+                    }
+                    return nextOpen
+                  })
+                }}
                 className="flex items-center gap-2.5 rounded-full border border-stone-200 bg-white px-3 py-1.5 text-sm font-medium text-stone-700 shadow-xs transition hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-cyan-700"
               >
                 <span
@@ -117,14 +130,16 @@ export default function AppLayout({ user: propUser, onLogout, children }) {
                   >
                     Editar perfil
                   </Link>
-                  <Link
-                    to="/operador/solicitud"
-                    role="menuitem"
-                    onClick={closeMenu}
-                    className="block px-4 py-2.5 text-sm text-stone-700 hover:bg-stone-50 hover:text-[#087E9A]"
-                  >
-                    Solicitud de Operador
-                  </Link>
+                  {(!currentUser?.role || currentUser?.role === 'VISITANTE') && (
+                    <Link
+                      to="/operador/solicitud"
+                      role="menuitem"
+                      onClick={closeMenu}
+                      className="block px-4 py-2.5 text-sm text-stone-700 hover:bg-stone-50 hover:text-[#087E9A]"
+                    >
+                      Solicitud de Operador
+                    </Link>
+                  )}
                   {(currentUser?.role === 'OPERADOR' ||
                     currentUser?.role === 'ADMIN') && (
                     <Link
@@ -134,6 +149,16 @@ export default function AppLayout({ user: propUser, onLogout, children }) {
                       className="block px-4 py-2.5 text-sm text-stone-700 hover:bg-stone-50 hover:text-[#087E9A]"
                     >
                       Panel de operador
+                    </Link>
+                  )}
+                  {currentUser?.role === 'ADMIN' && (
+                    <Link
+                      to="/admin"
+                      role="menuitem"
+                      onClick={closeMenu}
+                      className="block px-4 py-2.5 text-sm text-stone-700 hover:bg-stone-50 hover:text-[#087E9A]"
+                    >
+                      Panel de administración
                     </Link>
                   )}
                   {!isEmailVerified && (
@@ -179,7 +204,7 @@ export default function AppLayout({ user: propUser, onLogout, children }) {
           )}
         </nav>
       </header>
-      <main className="mx-auto max-w-5xl px-4 py-8">{children}</main>
+      <main className="mx-auto max-w-5xl px-4 py-8">{children ?? <Outlet />}</main>
     </div>
   )
 }
