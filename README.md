@@ -150,6 +150,8 @@ RutaSV-Fronted/
     ├── pages/                  Una pantalla por archivo
     │   ├── Home.jsx            Portada
     │   ├── NotFound.jsx        Página 404
+    │   ├── Operators/
+    │   │   └── OperatorRequestForm.jsx Solicitud de operador en dos pasos
     │   └── Auth/
     │       ├── Login.jsx / Login.test.jsx   Inicio de sesión
     │       ├── Registration.jsx             Registro
@@ -172,6 +174,14 @@ RutaSV-Fronted/
 | Una prueba | Junto al archivo: `Algo.test.jsx` |
 
 Nombres: componentes y páginas en `PascalCase.jsx`; utilidades en `camelCase.js`.
+
+### Solicitud para ser operador
+
+La ruta `/operador/solicitud` presenta un formulario responsive con dos pasos:
+datos del negocio y documentos/evidencias. La interfaz valida los campos y
+permite seleccionar imágenes JPG o PNG de hasta 5 MB. El envío aún no se
+conecta al backend; la vista informa claramente que no se ha enviado ninguna
+solicitud hasta que exista un endpoint de aplicación de operador.
 
 ### De HTML/CSS a React
 

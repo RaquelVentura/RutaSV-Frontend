@@ -22,6 +22,7 @@ import OperatorLayout from './pages/Operators/OperatorLayout.jsx'
 import OperatorReservations from './pages/Operators/OperatorReservations.jsx'
 import OperatorReviews from './pages/Operators/OperatorReviews.jsx'
 import OperatorSettings from './pages/Operators/OperatorSettings.jsx'
+import OperatorRequestForm from './pages/Operators/OperatorRequestForm.jsx'
 
 const googleClientId =
   import.meta.env.VITE_GOOGLE_CLIENT_ID || 'GOOGLE_CLIENT_ID_PLACEHOLDER'
@@ -29,7 +30,13 @@ const googleClientId =
 function AppContent() {
   const { pathname } = useLocation()
 
-  if (pathname.startsWith('/operador')) {
+  if (pathname === '/operador/solicitud') {
+    return (
+      <AppLayout>
+        <OperatorRequestForm />
+      </AppLayout>
+    )
+  } else if (pathname.startsWith('/operador')) {
     return (
       <Routes>
         <Route path="/operador" element={<OperatorLayout />}>
