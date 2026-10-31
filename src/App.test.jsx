@@ -27,6 +27,8 @@ describe('App', () => {
       screen.getByRole('heading', { name: /solicita ser operador/i }),
     ).toBeInTheDocument()
     expect(screen.getByLabelText(/nombre del negocio/i)).toBeInTheDocument()
+  })
+  
   it('muestra el panel del operador y permite abrir sus vistas', () => {
     renderAt('/operador')
 
