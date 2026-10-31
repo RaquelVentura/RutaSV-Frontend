@@ -30,7 +30,13 @@ const googleClientId =
 function AppContent() {
   const { pathname } = useLocation()
 
-  if (pathname.startsWith('/operador')) {
+  if (pathname === '/operador/solicitud') {
+    return (
+      <AppLayout>
+        <OperatorRequestForm />
+      </AppLayout>
+    )
+  } else if (pathname.startsWith('/operador')) {
     return (
       <Routes>
         <Route path="/operador" element={<OperatorLayout />}>
@@ -62,8 +68,6 @@ function AppContent() {
         <Route path="*" element={<NotFound />} />
       </Routes>
     )
-  } else if (pathname === '/operador/solicitud') {
-    return <OperatorRequestForm />
   }
 
   return (
