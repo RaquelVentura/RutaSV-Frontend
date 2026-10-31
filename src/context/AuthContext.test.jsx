@@ -1,5 +1,5 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AuthProvider, useAuth } from './AuthContext.jsx'
 
 function createMockJwt(payload) {
@@ -28,7 +28,7 @@ const sampleClaims = {
 }
 
 function TestConsumer({ tokenToLogin }) {
-  const { user, isAuthenticated, login, logout } = useAuth()
+  const { user, isAuthenticated, login, logout, refreshSession } = useAuth()
 
   return (
     <div>
@@ -48,6 +48,9 @@ function TestConsumer({ tokenToLogin }) {
       <button type="button" onClick={logout}>
         Logout
       </button>
+      <button type="button" onClick={() => refreshSession()}>
+        Refresh
+      </button>
     </div>
   )
 }
@@ -59,6 +62,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   localStorage.clear()
+  vi.restoreAllMocks()
 })
 
 describe('AuthContext', () => {
@@ -101,5 +105,39 @@ describe('AuthContext', () => {
 
     expect(screen.getByTestId('auth-status')).toHaveTextContent('invitado')
     expect(localStorage.getItem('token')).toBeNull()
+  })
+
+  it('actualiza el JWT y el rol a OPERADOR sin cerrar sesión al ejecutar refreshSession', async () => {
+    const visitorToken = createMockJwt(sampleClaims)
+    const operatorToken = createMockJwt({
+      ...sampleClaims,
+      'http://schemas.microsoft.com/ws/2008/06/identity/claims/role': 'OPERADOR',
+    })
+
+    localStorage.setItem('token', visitorToken)
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        id: sampleClaims.sub,
+        email: sampleClaims.email,
+        firstName: sampleClaims.given_name,
+        lastName: sampleClaims.family_name,
+        role: 'OPERADOR',
+        emailVerified: true,
+        token: operatorToken,
+      }),
+    })
+
+    render(
+      <AuthProvider>
+        <TestConsumer tokenToLogin={visitorToken} />
+      </AuthProvider>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('user-role')).toHaveTextContent('OPERADOR')
+    })
+    expect(localStorage.getItem('token')).toBe(operatorToken)
   })
 })

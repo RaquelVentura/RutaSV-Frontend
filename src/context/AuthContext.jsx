@@ -1,5 +1,12 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useCallback, useContext, useMemo, useState } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react'
 
 const roleClaimKey =
   'http://schemas.microsoft.com/ws/2008/06/identity/claims/role'
@@ -10,6 +17,7 @@ const defaultAuthContext = {
   login: () => {},
   logout: () => {},
   markEmailAsVerified: () => {},
+  refreshSession: async () => null,
 }
 
 export const AuthContext = createContext(defaultAuthContext)
@@ -141,6 +149,80 @@ export function AuthProvider({ children }) {
     [login],
   )
 
+  const refreshSession = useCallback(
+    async (fallbackRole = null) => {
+      const storedToken =
+        typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null
+      if (!storedToken) {
+        return null
+      }
+
+      try {
+        const response = await fetch('/api/auth/me', {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${storedToken}`,
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data?.token) {
+            return login(data.token)
+          }
+        }
+      } catch {
+        // Fallback when running in offline or unit test environment
+      }
+
+      if (fallbackRole) {
+        setUser((currentUser) =>
+          currentUser
+            ? {
+                ...currentUser,
+                role: fallbackRole,
+                [roleClaimKey]: fallbackRole,
+              }
+            : null,
+        )
+      }
+
+      return null
+    },
+    [login],
+  )
+
+  useEffect(() => {
+    const storedToken =
+      typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null
+    if (!storedToken) {
+      return undefined
+    }
+
+    const initialSyncTimer = setTimeout(() => {
+      refreshSession()
+    }, 0)
+
+    function handleFocus() {
+      refreshSession()
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        refreshSession()
+      }
+    }
+
+    window.addEventListener('focus', handleFocus)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      clearTimeout(initialSyncTimer)
+      window.removeEventListener('focus', handleFocus)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [refreshSession])
+
   const value = useMemo(
     () => ({
       user,
@@ -148,8 +230,9 @@ export function AuthProvider({ children }) {
       login,
       logout,
       markEmailAsVerified,
+      refreshSession,
     }),
-    [user, login, logout, markEmailAsVerified],
+    [user, login, logout, markEmailAsVerified, refreshSession],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

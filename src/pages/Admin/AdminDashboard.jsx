@@ -1,10 +1,15 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import AdminCard from '../../components/admin/AdminCard.jsx'
 import AdminPageHeader from '../../components/admin/AdminPageHeader.jsx'
 import Avatar from '../../components/admin/Avatar.jsx'
 import Pill from '../../components/admin/Pill.jsx'
 import LinkButton from '../../components/LinkButton.jsx'
-import { adminActivity, adminStats, operatorRequests } from '../../data/admin.js'
+import { adminActivity, adminStats } from '../../data/admin.js'
+import {
+  getOperatorRequests,
+  OperatorRequestStatus,
+} from '../../lib/operatorRequests.js'
 
 const tabs = [
   { label: 'Resumen', to: '/admin' },
@@ -17,6 +22,44 @@ const tabs = [
 const tabClass = 'rounded-full border border-mist bg-surface px-4 py-1.5 text-xs font-semibold text-ink'
 
 function AdminDashboard() {
+  const [pendingRequests, setPendingRequests] = useState([])
+  const [pendingCount, setPendingCount] = useState(adminStats[0]?.value ?? 0)
+
+  useEffect(() => {
+    let active = true
+
+    async function loadPending() {
+      try {
+        const response = await getOperatorRequests({
+          pageNumber: 1,
+          pageSize: 5,
+          status: OperatorRequestStatus.PENDIENTE,
+        })
+        if (active) {
+          setPendingRequests(response.data)
+          setPendingCount(response.totalRecords)
+        }
+      } catch {
+        if (active) {
+          setPendingRequests([])
+          setPendingCount(0)
+        }
+      }
+    }
+
+    loadPending()
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const stats = adminStats.map((stat) =>
+    stat.label === 'Solicitudes pendientes'
+      ? { ...stat, value: pendingCount }
+      : stat,
+  )
+
   return (
     <div className="space-y-6">
       <AdminPageHeader
@@ -53,7 +96,7 @@ function AdminDashboard() {
       </nav>
 
       <section aria-label="Resumen" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {adminStats.map((stat) => (
+        {stats.map((stat) => (
           <AdminCard key={stat.label}>
             <p className="text-xs text-muted">{stat.label}</p>
             <p className="mt-2 text-3xl font-extrabold text-ink">{stat.value}</p>
@@ -73,30 +116,38 @@ function AdminDashboard() {
             </Link>
           }
         >
-          <ul className="divide-y divide-mist">
-            {operatorRequests.slice(0, 3).map((request) => (
-              <li key={request.id} className="flex flex-wrap items-center gap-3 py-4">
-                <Avatar name={request.name} />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-ink">{request.name}</p>
-                  <p className="text-xs text-muted">
-                    {request.business} · {request.service}
-                  </p>
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  <span className="text-xs text-muted">{request.sentAt}</span>
-                  <Pill tone="pending">Pendiente</Pill>
-                </div>
-                <LinkButton
-                  to={`/admin/solicitudes/${request.id}`}
-                  variant="outline"
-                  className="px-3 py-1.5 text-xs"
-                >
-                  Revisar
-                </LinkButton>
-              </li>
-            ))}
-          </ul>
+          {pendingRequests.length === 0 ? (
+            <p className="py-6 text-sm text-muted">
+              No hay solicitudes de operador pendientes por el momento.
+            </p>
+          ) : (
+            <ul className="divide-y divide-mist">
+              {pendingRequests.slice(0, 3).map((request) => (
+                <li key={request.id} className="flex flex-wrap items-center gap-3 py-4">
+                  <Avatar name={request.name} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-ink">{request.name}</p>
+                    <p className="text-xs text-muted">
+                      {request.business}
+                      {request.address ? ` · ${request.address}` : ''}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className="text-xs text-muted">{request.sentAt}</span>
+                    <Pill tone="pending">Pendiente</Pill>
+                  </div>
+                  <LinkButton
+                    to={`/admin/solicitudes/${request.id}`}
+                    state={{ request }}
+                    variant="outline"
+                    className="px-3 py-1.5 text-xs"
+                  >
+                    Revisar
+                  </LinkButton>
+                </li>
+              ))}
+            </ul>
+          )}
         </AdminCard>
 
         <AdminCard title="Actividad reciente">

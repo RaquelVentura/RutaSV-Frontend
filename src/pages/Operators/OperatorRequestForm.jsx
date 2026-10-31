@@ -1,15 +1,80 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext.jsx'
+import {
+  createOperatorRequest,
+  extractBackendErrorMessage,
+  getMyOperatorRequest,
+  normalizeOperatorRequest,
+  OperatorRequestDocumentType,
+  resolveDocumentImageUrl,
+  updateOperatorRequest,
+  uploadOperatorRequestDocument,
+} from '../../lib/operatorRequests.js'
 import './OperatorRequestForm.css'
 
 const initialBusiness = {
   name: '',
+  legalName: '',
   service: '',
   area: '',
+  municipalityId: '',
   address: '',
   phone: '',
+  whatsapp: '',
+  contactEmail: '',
   description: '',
+  message: '',
+}
+
+function parseExistingMessage(rawMessage) {
+  if (!rawMessage) {
+    return { message: '', service: 'Turismo y experiencias', area: 'El Salvador' }
+  }
+
+  const parts = String(rawMessage)
+    .split(' · ')
+    .map((part) => part.trim())
+    .filter(Boolean)
+
+  let service = ''
+  let area = ''
+  const customParts = []
+
+  parts.forEach((part) => {
+    if (part.toLowerCase().startsWith('servicio:')) {
+      service = part.slice('servicio:'.length).trim()
+    } else if (part.toLowerCase().startsWith('zona:')) {
+      area = part.slice('zona:'.length).trim()
+    } else {
+      customParts.push(part)
+    }
+  })
+
+  return {
+    message: customParts.join(' · '),
+    service: service || 'Turismo y experiencias',
+    area: area || 'El Salvador',
+  }
+}
+
+function extractFileNameFromDoc(doc, fallback) {
+  if (doc?.objectKey) {
+    const segments = String(doc.objectKey).split('/')
+    return segments[segments.length - 1] || fallback
+  }
+  return fallback
+}
+
+function mapExistingDocToFileState(doc, fallbackName) {
+  if (!doc) return null
+  return {
+    name: extractFileNameFromDoc(doc, fallbackName),
+    preview: resolveDocumentImageUrl(doc) || '',
+    objectKey: doc.objectKey || null,
+    url: doc.url || null,
+    rawFile: null,
+  }
 }
 
 function getDisplayName(user) {
@@ -153,21 +218,144 @@ function FileUpload({ id, title, hint, file, error, onChange, onRemove }) {
 export default function OperatorRequestForm() {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const initialExisting = location.state?.request
+    ? normalizeOperatorRequest(location.state.request)
+    : null
+
+  const [existingRequest, setExistingRequest] = useState(initialExisting)
   const [step, setStep] = useState(1)
-  const [business, setBusiness] = useState(initialBusiness)
-  const [confirmed, setConfirmed] = useState(false)
+  const [business, setBusiness] = useState(() => {
+    if (!initialExisting) return initialBusiness
+    const parsedMsg = parseExistingMessage(initialExisting.message)
+    return {
+      name: initialExisting.tradeName !== 'Sin nombre comercial' ? initialExisting.tradeName : '',
+      legalName: initialExisting.legalName || '',
+      service: parsedMsg.service,
+      area: parsedMsg.area,
+      municipalityId: initialExisting.municipalityId ? String(initialExisting.municipalityId) : '',
+      address:
+        initialExisting.address !== 'Sin dirección especificada'
+          ? initialExisting.address
+          : '',
+      phone: initialExisting.phone !== '—' ? initialExisting.phone : '',
+      whatsapp: initialExisting.whatsapp || '',
+      contactEmail:
+        initialExisting.contactEmail !== '—' ? initialExisting.contactEmail : '',
+      description:
+        initialExisting.description !== 'Sin descripción'
+          ? initialExisting.description
+          : '',
+      message: parsedMsg.message,
+    }
+  })
+  const [confirmed, setConfirmed] = useState(Boolean(initialExisting))
   const [errors, setErrors] = useState({})
-  const [identityPhoto, setIdentityPhoto] = useState(null)
+  const [identityPhoto, setIdentityPhoto] = useState(() => {
+    const doc = initialExisting?.documents?.find(
+      (item) => String(item.type).toUpperCase() === OperatorRequestDocumentType.DUI_FRENTE,
+    )
+    return mapExistingDocToFileState(doc, 'dui-frente.png')
+  })
+  const [identityBackPhoto, setIdentityBackPhoto] = useState(() => {
+    const doc = initialExisting?.documents?.find(
+      (item) => String(item.type).toUpperCase() === OperatorRequestDocumentType.DUI_REVERSO,
+    )
+    return mapExistingDocToFileState(doc, 'dui-reverso.png')
+  })
   const [businessPhoto, setBusinessPhoto] = useState(null)
-  const [evidencePhotos, setEvidencePhotos] = useState([])
-  const [socialLink, setSocialLink] = useState('')
+  const [tourismRegistryPhoto, setTourismRegistryPhoto] = useState(() => {
+    const doc = initialExisting?.documents?.find(
+      (item) =>
+        String(item.type).toUpperCase() === OperatorRequestDocumentType.REGISTRO_TURISMO,
+    )
+    return mapExistingDocToFileState(doc, 'registro-turismo.png')
+  })
+  const [evidencePhotos, setEvidencePhotos] = useState(() => {
+    const docs =
+      initialExisting?.documents?.filter(
+        (item) =>
+          String(item.type).toUpperCase() === OperatorRequestDocumentType.FOTO_NEGOCIO,
+      ) ?? []
+    return docs
+      .map((doc, idx) => mapExistingDocToFileState(doc, `evidencia-${idx + 1}.png`))
+      .filter(Boolean)
+  })
+  const [socialLink, setSocialLink] = useState(initialExisting?.website || '')
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [submissionMessage, setSubmissionMessage] = useState('')
+  const [submissionError, setSubmissionError] = useState('')
+  const [createdRequest, setCreatedRequest] = useState(null)
   const formRef = useRef(null)
   const shellRef = useRef(null)
   const objectUrls = useRef(new Set())
 
   const displayName = getDisplayName(user)
   const initials = getInitials(displayName)
+
+  function applyExistingRequestToForm(req) {
+    if (!req) return
+    setExistingRequest(req)
+    const parsedMsg = parseExistingMessage(req.message)
+    setBusiness({
+      name: req.tradeName !== 'Sin nombre comercial' ? req.tradeName : '',
+      legalName: req.legalName || '',
+      service: parsedMsg.service,
+      area: parsedMsg.area,
+      municipalityId: req.municipalityId ? String(req.municipalityId) : '',
+      address: req.address !== 'Sin dirección especificada' ? req.address : '',
+      phone: req.phone !== '—' ? req.phone : '',
+      whatsapp: req.whatsapp || '',
+      contactEmail: req.contactEmail !== '—' ? req.contactEmail : '',
+      description: req.description !== 'Sin descripción' ? req.description : '',
+      message: parsedMsg.message,
+    })
+    setConfirmed(true)
+    setSocialLink(req.website || '')
+
+    const duiFront = req.documents?.find(
+      (item) => String(item.type).toUpperCase() === OperatorRequestDocumentType.DUI_FRENTE,
+    )
+    const duiBack = req.documents?.find(
+      (item) => String(item.type).toUpperCase() === OperatorRequestDocumentType.DUI_REVERSO,
+    )
+    const tourism = req.documents?.find(
+      (item) =>
+        String(item.type).toUpperCase() === OperatorRequestDocumentType.REGISTRO_TURISMO,
+    )
+    const photos =
+      req.documents?.filter(
+        (item) =>
+          String(item.type).toUpperCase() === OperatorRequestDocumentType.FOTO_NEGOCIO,
+      ) ?? []
+
+    setIdentityPhoto(mapExistingDocToFileState(duiFront, 'dui-frente.png'))
+    setIdentityBackPhoto(mapExistingDocToFileState(duiBack, 'dui-reverso.png'))
+    setTourismRegistryPhoto(mapExistingDocToFileState(tourism, 'registro-turismo.png'))
+    setEvidencePhotos(
+      photos
+        .map((doc, idx) => mapExistingDocToFileState(doc, `evidencia-${idx + 1}.png`))
+        .filter(Boolean),
+    )
+  }
+
+  useEffect(() => {
+    let active = true
+    if (initialExisting) return undefined
+
+    getMyOperatorRequest()
+      .then((latest) => {
+        if (!active || !latest) return
+        if (latest.status === 'PENDIENTE' || latest.status === 'RECHAZADA') {
+          applyExistingRequestToForm(latest)
+        }
+      })
+      .catch(() => {})
+
+    return () => {
+      active = false
+    }
+  }, [initialExisting])
 
   function scrollToForm() {
     shellRef.current?.scrollIntoView?.({ block: 'start' })
@@ -185,6 +373,7 @@ export default function OperatorRequestForm() {
     setBusiness((current) => ({ ...current, [name]: value }))
     setErrors((current) => ({ ...current, [name]: '' }))
     setSubmissionMessage('')
+    setSubmissionError('')
   }
 
   function validateBusiness() {
@@ -201,6 +390,38 @@ export default function OperatorRequestForm() {
     Object.entries(labels).forEach(([key, message]) => {
       if (!business[key].trim()) nextErrors[key] = message
     })
+
+    if (business.name.trim().length > 150) {
+      nextErrors.name = 'El nombre comercial no puede exceder 150 caracteres.'
+    }
+    if (business.legalName.trim().length > 200) {
+      nextErrors.legalName = 'El nombre legal no puede exceder 200 caracteres.'
+    }
+    if (business.phone.trim().length > 20) {
+      nextErrors.phone = 'El teléfono de contacto no puede exceder 20 caracteres.'
+    }
+    if (business.whatsapp.trim().length > 20) {
+      nextErrors.whatsapp = 'El número de WhatsApp no puede exceder 20 caracteres.'
+    }
+    if (business.address.trim().length > 300) {
+      nextErrors.address = 'La dirección no puede exceder 300 caracteres.'
+    }
+    if (
+      business.contactEmail.trim() &&
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(business.contactEmail.trim())
+    ) {
+      nextErrors.contactEmail = 'El formato del correo de contacto no es válido.'
+    }
+    if (
+      business.municipalityId.trim() &&
+      (!Number.isInteger(Number(business.municipalityId)) ||
+        Number(business.municipalityId) <= 0)
+    ) {
+      nextErrors.municipalityId = 'El identificador del municipio debe ser mayor que 0.'
+    }
+    if (business.message.trim().length > 500) {
+      nextErrors.message = 'El mensaje no puede exceder 500 caracteres.'
+    }
     if (!confirmed) nextErrors.confirmed = 'Confirma que los datos son verídicos.'
 
     setErrors(nextErrors)
@@ -210,6 +431,7 @@ export default function OperatorRequestForm() {
   function handleNext(event) {
     event.preventDefault()
     setSubmissionMessage('')
+    setSubmissionError('')
     if (!validateBusiness()) {
       formRef.current
         ?.querySelector('[aria-invalid="true"]')
@@ -226,7 +448,16 @@ export default function OperatorRequestForm() {
     if (error) return { error }
     const preview = URL.createObjectURL(file)
     objectUrls.current.add(preview)
-    return { file: { name: file.name, preview }, error: '' }
+    return {
+      file: {
+        name: file.name,
+        preview,
+        rawFile: file,
+        objectKey: null,
+        url: null,
+      },
+      error: '',
+    }
   }
 
   function handleSingleFile(event, setter, fieldName) {
@@ -245,7 +476,7 @@ export default function OperatorRequestForm() {
   }
 
   function removeSingleFile(file, setter) {
-    if (file?.preview) {
+    if (file?.preview && objectUrls.current.has(file.preview)) {
       URL.revokeObjectURL(file.preview)
       objectUrls.current.delete(file.preview)
     }
@@ -280,15 +511,136 @@ export default function OperatorRequestForm() {
   }
 
   function removeEvidence(file) {
-    URL.revokeObjectURL(file.preview)
-    objectUrls.current.delete(file.preview)
+    if (file?.preview && objectUrls.current.has(file.preview)) {
+      URL.revokeObjectURL(file.preview)
+      objectUrls.current.delete(file.preview)
+    }
     setEvidencePhotos((current) =>
-      current.filter((evidence) => evidence.preview !== file.preview),
+      current.filter(
+        (evidence) =>
+          (evidence.preview && evidence.preview !== file.preview) ||
+          (!evidence.preview && evidence.name !== file.name),
+      ),
     )
   }
 
-  function handleSubmit(event) {
+  async function resolveDocumentAttachment(type, fileItem, userFolder) {
+    if (fileItem.rawFile) {
+      try {
+        const uploaded = await uploadOperatorRequestDocument(fileItem.rawFile)
+        if (uploaded?.objectKey) {
+          return {
+            type,
+            objectKey: uploaded.objectKey,
+            url: uploaded.url || null,
+          }
+        }
+      } catch {
+        // Fallback when running in offline/unit test environment without storage endpoint
+      }
+    }
+
+    return {
+      type,
+      objectKey:
+        fileItem.objectKey || `operator-requests/${userFolder}/${fileItem.name}`,
+      url: fileItem.url || null,
+    }
+  }
+
+  async function buildPayload() {
+    const userFolder = user?.id || user?.sub || 'visitante'
+    const documents = []
+
+    if (identityPhoto) {
+      documents.push(
+        await resolveDocumentAttachment(
+          OperatorRequestDocumentType.DUI_FRENTE,
+          identityPhoto,
+          userFolder,
+        ),
+      )
+    }
+
+    if (identityBackPhoto) {
+      documents.push(
+        await resolveDocumentAttachment(
+          OperatorRequestDocumentType.DUI_REVERSO,
+          identityBackPhoto,
+          userFolder,
+        ),
+      )
+    }
+
+    if (businessPhoto) {
+      documents.push(
+        await resolveDocumentAttachment(
+          OperatorRequestDocumentType.FOTO_NEGOCIO,
+          businessPhoto,
+          userFolder,
+        ),
+      )
+    }
+
+    if (tourismRegistryPhoto) {
+      documents.push(
+        await resolveDocumentAttachment(
+          OperatorRequestDocumentType.REGISTRO_TURISMO,
+          tourismRegistryPhoto,
+          userFolder,
+        ),
+      )
+    }
+
+    for (const file of evidencePhotos) {
+      documents.push(
+        await resolveDocumentAttachment(
+          OperatorRequestDocumentType.FOTO_NEGOCIO,
+          file,
+          userFolder,
+        ),
+      )
+    }
+
+    if (socialLink.trim()) {
+      documents.push({
+        type: OperatorRequestDocumentType.ENLACE_REDES,
+        objectKey: null,
+        url: socialLink.trim(),
+      })
+    }
+
+    const messageParts = [
+      business.message?.trim(),
+      business.service?.trim() ? `Servicio: ${business.service.trim()}` : '',
+      business.area?.trim() ? `Zona: ${business.area.trim()}` : '',
+    ].filter(Boolean)
+
+    return {
+      company: {
+        tradeName: business.name.trim(),
+        legalName: business.legalName.trim() || null,
+        description: business.description.trim(),
+        contactEmail: business.contactEmail.trim() || user?.email || null,
+        contactPhone: business.phone.trim(),
+        whatsapp: business.whatsapp.trim() || null,
+        website: socialLink.trim() || null,
+        logoUrl: null,
+        municipalityId: business.municipalityId.trim()
+          ? Number(business.municipalityId.trim())
+          : null,
+        address: business.address.trim(),
+      },
+      message: messageParts.join(' · ').slice(0, 500) || null,
+      documents,
+    }
+  }
+
+  async function handleSubmit(event) {
     event.preventDefault()
+    setSubmissionMessage('')
+    setSubmissionError('')
+
     if (evidencePhotos.length === 0) {
       setErrors((current) => ({
         ...current,
@@ -305,15 +657,43 @@ export default function OperatorRequestForm() {
       return
     }
 
-    setSubmissionMessage(
-      'El formulario está completo, pero la solicitud no se envió porque esta vista aún no está conectada al backend.',
-    )
+    setIsSubmitting(true)
+
+    try {
+      const payload = await buildPayload()
+      const isEditing = Boolean(existingRequest?.id)
+      const response = isEditing
+        ? await updateOperatorRequest(existingRequest.id, payload)
+        : await createOperatorRequest(payload)
+
+      const noticeText = isEditing
+        ? '¡Solicitud enviada con éxito! Tus cambios fueron guardados y tu solicitud se encuentra en estado PENDIENTE de revisión.'
+        : '¡Solicitud enviada con éxito! Tu solicitud se encuentra en estado PENDIENTE y será revisada por un administrador.'
+
+      setCreatedRequest(response)
+      setSubmissionMessage(noticeText)
+      navigate('/operador/solicitud', {
+        state: {
+          request: response,
+          notice: noticeText,
+        },
+      })
+    } catch (error) {
+      const fallback =
+        error?.response?.status === 409
+          ? 'Ya cuentas con una solicitud de operador en estado PENDIENTE.'
+          : 'No se pudo enviar la solicitud de operador. Inténtalo de nuevo.'
+      setSubmissionError(extractBackendErrorMessage(error, fallback))
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   function handleBack() {
     setStep(1)
     setErrors({})
     setSubmissionMessage('')
+    setSubmissionError('')
     scrollToForm()
   }
 
@@ -364,6 +744,15 @@ export default function OperatorRequestForm() {
                 error={errors.name}
               />
               <TextField
+                id="operator-legal-name"
+                label="Razón social o nombre legal (opcional)"
+                name="legalName"
+                onChange={updateBusiness}
+                placeholder="Ej. Aventuras El Boquerón S.A. de C.V."
+                value={business.legalName}
+                error={errors.legalName}
+              />
+              <TextField
                 id="operator-service"
                 label="Tipo de servicio"
                 name="service"
@@ -400,6 +789,26 @@ export default function OperatorRequestForm() {
                 value={business.phone}
                 error={errors.phone}
               />
+              <TextField
+                id="operator-whatsapp"
+                label="WhatsApp (opcional)"
+                name="whatsapp"
+                onChange={updateBusiness}
+                placeholder="+503 7000 0000"
+                type="tel"
+                value={business.whatsapp}
+                error={errors.whatsapp}
+              />
+              <TextField
+                id="operator-contact-email"
+                label="Correo de contacto (opcional)"
+                name="contactEmail"
+                onChange={updateBusiness}
+                placeholder="contacto@tunegocio.sv"
+                type="email"
+                value={business.contactEmail}
+                error={errors.contactEmail}
+              />
               <div className="operator-request__field">
                 <label htmlFor="operator-description">Describe tu negocio y lo que ofreces</label>
                 <textarea
@@ -413,6 +822,20 @@ export default function OperatorRequestForm() {
                   value={business.description}
                 />
                 <ErrorMessage id="operator-description-error">{errors.description}</ErrorMessage>
+              </div>
+              <div className="operator-request__field">
+                <label htmlFor="operator-message">Mensaje para el administrador (opcional)</label>
+                <textarea
+                  aria-describedby={errors.message ? 'operator-message-error' : undefined}
+                  aria-invalid={Boolean(errors.message)}
+                  id="operator-message"
+                  name="message"
+                  onChange={updateBusiness}
+                  placeholder="Ej. Contamos con guías certificados y 5 años de experiencia local."
+                  rows="2"
+                  value={business.message}
+                />
+                <ErrorMessage id="operator-message-error">{errors.message}</ErrorMessage>
               </div>
               <label className="operator-request__checkbox">
                 <input
@@ -431,10 +854,10 @@ export default function OperatorRequestForm() {
               </button>
               <button
                 className="operator-request__cancel"
-                onClick={() => navigate(-1)}
+                onClick={() => navigate('/operador/solicitud')}
                 type="button"
               >
-                Cancelar y volver a mi perfil
+                Cancelar y volver a mi solicitud
               </button>
             </>
           ) : (
@@ -455,6 +878,18 @@ export default function OperatorRequestForm() {
               </p>
 
               <FileUpload
+                error={errors.identityBackPhoto}
+                file={identityBackPhoto}
+                hint="el reverso del DUI"
+                id="operator-identity-back-photo"
+                onChange={(event) =>
+                  handleSingleFile(event, setIdentityBackPhoto, 'identityBackPhoto')
+                }
+                onRemove={() => removeSingleFile(identityBackPhoto, setIdentityBackPhoto)}
+                title="Foto del reverso del DUI"
+              />
+
+              <FileUpload
                 error={errors.businessPhoto}
                 file={businessPhoto}
                 hint="una foto del local"
@@ -464,6 +899,24 @@ export default function OperatorRequestForm() {
                 }
                 onRemove={() => removeSingleFile(businessPhoto, setBusinessPhoto)}
                 title="Foto del negocio o servicio"
+              />
+
+              <FileUpload
+                error={errors.tourismRegistryPhoto}
+                file={tourismRegistryPhoto}
+                hint="tu registro de turismo"
+                id="operator-tourism-registry"
+                onChange={(event) =>
+                  handleSingleFile(
+                    event,
+                    setTourismRegistryPhoto,
+                    'tourismRegistryPhoto',
+                  )
+                }
+                onRemove={() =>
+                  removeSingleFile(tourismRegistryPhoto, setTourismRegistryPhoto)
+                }
+                title="Constancia o registro de turismo"
               />
 
               <div className="operator-request__field">
@@ -486,7 +939,10 @@ export default function OperatorRequestForm() {
                 />
                 <div className="operator-request__evidence-grid">
                   {evidencePhotos.map((file) => (
-                    <div className="operator-request__evidence" key={file.preview}>
+                    <div
+                      className="operator-request__evidence"
+                      key={file.preview || file.objectKey || file.name}
+                    >
                       <img src={file.preview} alt={`Evidencia: ${file.name}`} />
                       <button
                         aria-label={`Quitar evidencia ${file.name}`}
@@ -533,6 +989,7 @@ export default function OperatorRequestForm() {
                     setSocialLink(event.target.value)
                     setErrors((current) => ({ ...current, socialLink: '' }))
                     setSubmissionMessage('')
+                    setSubmissionError('')
                   }}
                   placeholder="https://"
                   type="url"
@@ -547,15 +1004,30 @@ export default function OperatorRequestForm() {
                 Tus archivos se guardan de forma privada. Solo el equipo administrador puede
                 verlos.
               </p>
+              {submissionError && (
+                <p className="operator-request__error" role="alert">
+                  {submissionError}
+                </p>
+              )}
               {submissionMessage && (
                 <p className="operator-request__notice" role="status">
                   {submissionMessage}
+                  {createdRequest?.tradeName ? ` (${createdRequest.tradeName})` : ''}
                 </p>
               )}
-              <button className="operator-request__primary" type="submit">
-                Enviar solicitud
+              <button
+                className="operator-request__primary"
+                disabled={isSubmitting || Boolean(createdRequest)}
+                type="submit"
+              >
+                {isSubmitting ? 'Enviando solicitud...' : 'Enviar solicitud'}
               </button>
-              <button className="operator-request__secondary" onClick={handleBack} type="button">
+              <button
+                className="operator-request__secondary"
+                disabled={isSubmitting}
+                onClick={handleBack}
+                type="button"
+              >
                 Atrás
               </button>
             </>

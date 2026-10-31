@@ -1,142 +1,103 @@
-import { Route, Routes } from 'react-router-dom'
-import AuthCard from './components/AuthCard.jsx'
-import PagePlaceholder from './components/PagePlaceholder.jsx'
+import { Navigate, Route, Routes } from 'react-router-dom'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
-import AuthLayout from './layouts/AuthLayout.jsx'
-import MainLayout from './layouts/MainLayout.jsx'
+import AdminLayout from './layouts/AdminLayout.jsx'
+import AppLayout from './layouts/AppLayout.jsx'
 import { Roles } from './lib/roles.js'
+import AdminDashboard from './pages/Admin/AdminDashboard.jsx'
+import CreateUser from './pages/Admin/CreateUser.jsx'
+import RequestDetail from './pages/Admin/RequestDetail.jsx'
+import RequestsQueue from './pages/Admin/RequestsQueue.jsx'
+import UsersList from './pages/Admin/UsersList.jsx'
+import EmailVerification from './pages/Auth/EmailVerification.jsx'
+import Login from './pages/Auth/Login.jsx'
+import Registration from './pages/Auth/Registration.jsx'
+import VerificationResult from './pages/Auth/VerificationResult.jsx'
 import Forbidden from './pages/Forbidden.jsx'
 import Home from './pages/Home.jsx'
 import NotFound from './pages/NotFound.jsx'
+import OperatorAvailability from './pages/Operators/OperatorAvailability.jsx'
+import OperatorDashboard from './pages/Operators/OperatorDashboard.jsx'
+import OperatorExperienceForm from './pages/Operators/OperatorExperienceForm.jsx'
+import OperatorExperiences from './pages/Operators/OperatorExperiences.jsx'
+import OperatorLayout from './pages/Operators/OperatorLayout.jsx'
+import MyOperatorRequest from './pages/Operators/MyOperatorRequest.jsx'
+import OperatorRequestForm from './pages/Operators/OperatorRequestForm.jsx'
+import OperatorReservations from './pages/Operators/OperatorReservations.jsx'
+import OperatorReviews from './pages/Operators/OperatorReviews.jsx'
+import OperatorSettings from './pages/Operators/OperatorSettings.jsx'
 
 function AppRoutes() {
   return (
     <Routes>
-      <Route element={<AuthLayout />}>
-        <Route
-          path="/auth/login"
-          element={
-            <AuthCard
-              eyebrow="Tu próxima historia empieza aquí"
-              title="Qué bueno verte de nuevo"
-              subtitle="Ingresa para seguir descubriendo El Salvador."
-            >
-              <p className="text-muted">Formulario pendiente de implementar.</p>
-            </AuthCard>
-          }
-        />
-        <Route
-          path="/auth/register"
-          element={
-            <AuthCard
-              eyebrow="Viaja cerca. Vive más."
-              title="Tu aventura, a un paso"
-              subtitle="Crea tu cuenta y encuentra experiencias con alma local."
-            >
-              <p className="text-muted">Formulario pendiente de implementar.</p>
-            </AuthCard>
-          }
-        />
-        <Route
-          path="/verify-email"
-          element={
-            <AuthCard title="Verifica tu correo">
-              <p className="text-muted">Pantalla pendiente de implementar.</p>
-            </AuthCard>
-          }
-        />
-      </Route>
-
-      <Route element={<MainLayout />}>
-        <Route path="/" element={<Home />} />
-        <Route
-          path="/experiencias"
-          element={
-            <PagePlaceholder title="Catálogo de experiencias"/>
-          }
-        />
-        <Route
-          path="/experiencias/:slug"
-          element={<PagePlaceholder title="Detalle de experiencia" />}
-        />
-
-        <Route element={<ProtectedRoute />}>
-          <Route
-            path="/perfil"
-            element={<PagePlaceholder title="Mi perfil" />}
-          />
-        </Route>
-
-        <Route element={<ProtectedRoute roles={[Roles.VISITANTE]} />}>
-          <Route
-            path="/mis-reservas"
-            element={<PagePlaceholder title="Mis reservas"/>}
-          />
-          <Route
-            path="/favoritos"
-            element={<PagePlaceholder title="Favoritos" />}
-          />
-          <Route
-            path="/solicitar-operador"
-            element={
-              <PagePlaceholder title="Solicitar ser operador"/>
-            }
-          />
-        </Route>
-
-        <Route
-          path="/operador"
-          element={<ProtectedRoute roles={[Roles.OPERADOR, Roles.ADMIN]} />}
-        >
-          <Route
-            index
-            element={<PagePlaceholder title="Panel del operador" />}
-          />
-          <Route
-            path="experiencias"
-            element={<PagePlaceholder title="Mis experiencias" />}
-          />
-          <Route
-            path="experiencias/nueva"
-            element={
-              <PagePlaceholder title="Publicar experiencia"/>
-            }
-          />
+      {/* Panel de operador: requiere rol OPERADOR o ADMIN */}
+      <Route element={<ProtectedRoute roles={[Roles.OPERADOR, Roles.ADMIN]} />}>
+        <Route path="/operador" element={<OperatorLayout />}>
+          <Route index element={<OperatorDashboard />} />
+          <Route path="experiencias" element={<OperatorExperiences />} />
+          <Route path="experiencias/nueva" element={<OperatorExperienceForm />} />
+          <Route path="cupos" element={<OperatorAvailability />} />
           <Route
             path="calendario"
-            element={<PagePlaceholder title="Calendario" />}
+            element={<Navigate to="/operador/cupos" replace />}
           />
+          <Route path="reservas" element={<OperatorReservations />} />
+          <Route path="resenas" element={<OperatorReviews />} />
+          <Route path="configuracion" element={<OperatorSettings />} />
+        </Route>
+      </Route>
+
+      {/* Panel de administración: requiere rol ADMIN */}
+      <Route element={<ProtectedRoute roles={[Roles.ADMIN]} />}>
+        <Route path="/admin" element={<AdminLayout />}>
+          <Route index element={<AdminDashboard />} />
+          <Route path="usuarios" element={<UsersList />} />
+          <Route path="usuarios/nuevo" element={<CreateUser />} />
+          <Route path="solicitudes" element={<RequestsQueue />} />
           <Route
-            path="reservas"
-            element={<PagePlaceholder title="Reservas recibidas" />}
+            path="solicitudes-operador"
+            element={<Navigate to="/admin/solicitudes" replace />}
+          />
+          <Route path="solicitudes/:id" element={<RequestDetail />} />
+        </Route>
+      </Route>
+
+      {/* Rutas públicas y de visitante autenticado bajo AppLayout */}
+      <Route element={<AppLayout />}>
+        <Route path="/" element={<Home />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/auth/login" element={<Navigate to="/login" replace />} />
+        <Route path="/registro" element={<Registration />} />
+        <Route
+          path="/auth/register"
+          element={<Navigate to="/registro" replace />}
+        />
+        <Route path="/verify-email" element={<EmailVerification />} />
+        <Route path="/registro/verificar" element={<EmailVerification />} />
+        <Route
+          path="/registro/verificacion/aceptada"
+          element={<VerificationResult accepted />}
+        />
+        <Route
+          path="/registro/verificacion/rechazada"
+          element={<VerificationResult accepted={false} />}
+        />
+
+        {/* Estado y detalle de solicitud de operador */}
+        <Route
+          element={<ProtectedRoute roles={[Roles.VISITANTE, Roles.OPERADOR]} />}
+        >
+          <Route path="/operador/solicitud" element={<MyOperatorRequest />} />
+          <Route
+            path="/solicitar-operador"
+            element={<Navigate to="/operador/solicitud" replace />}
           />
         </Route>
 
-        <Route
-          path="/admin"
-          element={<ProtectedRoute roles={[Roles.ADMIN]} />}
-        >
+        {/* Creación o modificación de solicitud de operador: requiere visitante autenticado */}
+        <Route element={<ProtectedRoute roles={[Roles.VISITANTE]} />}>
           <Route
-            index
-            element={<PagePlaceholder title="Panel de administración" />}
-          />
-          <Route
-            path="solicitudes-operador"
-            element={
-              <PagePlaceholder title="Solicitudes de operador"/>
-            }
-          />
-          <Route
-            path="usuarios"
-            element={<PagePlaceholder title="Usuarios" />}
-          />
-          <Route
-            path="empresas"
-            element={<PagePlaceholder title="Empresas" />}
-          />
-          <Route
-            path="experiencias"
-            element={<PagePlaceholder title="Moderación de experiencias" />}
+            path="/operador/solicitud/formulario"
+            element={<OperatorRequestForm />}
           />
         </Route>
 

@@ -1,9 +1,41 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import App from './App.jsx'
 
-afterEach(cleanup)
+function createMockJwt(payload) {
+  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
+  const jsonPayload = JSON.stringify(payload)
+  const utf8Bytes = new TextEncoder().encode(jsonPayload)
+  const binary = Array.from(utf8Bytes, (byte) => String.fromCharCode(byte)).join('')
+  const base64Payload = btoa(binary)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
+  return `${header}.${base64Payload}.signature`
+}
+
+function setRoleSession(role) {
+  const token = createMockJwt({
+    sub: '3f2504e0-4f89-11d3-9a0c-0305e82c3301',
+    email: `${role.toLowerCase()}@rutasv.com`,
+    given_name: 'Usuario',
+    family_name: role,
+    'http://schemas.microsoft.com/ws/2008/06/identity/claims/role': role,
+    email_verified: 'true',
+    exp: 4102444800,
+  })
+  localStorage.setItem('token', token)
+}
+
+beforeEach(() => {
+  localStorage.clear()
+})
+
+afterEach(() => {
+  cleanup()
+  localStorage.clear()
+})
 
 function renderAt(path) {
   return render(
@@ -21,15 +53,32 @@ describe('App', () => {
     ).toBeInTheDocument()
   })
 
-  it('muestra el formulario de solicitud de operador en su ruta', () => {
+  it('redirige a /login si un visitante no autenticado intenta abrir /operador/solicitud', () => {
     renderAt('/operador/solicitud')
+    expect(
+      screen.getByRole('heading', { name: /qué bueno verte de nuevo/i }),
+    ).toBeInTheDocument()
+  })
+
+  it('muestra el formulario de solicitud de operador en su ruta para VISITANTE autenticado', () => {
+    setRoleSession('VISITANTE')
+    renderAt('/operador/solicitud/formulario')
     expect(
       screen.getByRole('heading', { name: /solicita ser operador/i }),
     ).toBeInTheDocument()
     expect(screen.getByLabelText(/nombre del negocio/i)).toBeInTheDocument()
   })
-  
+
+  it('muestra Sin permiso cuando un VISITANTE intenta acceder a /admin', () => {
+    setRoleSession('VISITANTE')
+    renderAt('/admin')
+    expect(
+      screen.getByRole('heading', { name: /sin permiso/i }),
+    ).toBeInTheDocument()
+  })
+
   it('muestra el panel del operador y permite abrir sus vistas', () => {
+    setRoleSession('OPERADOR')
     renderAt('/operador')
 
     expect(screen.getByRole('heading', { name: 'Resumen' })).toBeInTheDocument()
@@ -42,6 +91,7 @@ describe('App', () => {
   })
 
   it('permite buscar y filtrar las experiencias de muestra', () => {
+    setRoleSession('OPERADOR')
     renderAt('/operador/experiencias')
 
     const search = screen.getByRole('searchbox', { name: 'Buscar experiencias' })
@@ -56,6 +106,7 @@ describe('App', () => {
   })
 
   it('valida la publicación de experiencias e informa que aún no se guarda en backend', () => {
+    setRoleSession('OPERADOR')
     renderAt('/operador/experiencias/nueva')
 
     fireEvent.click(screen.getByRole('button', { name: 'Guardar experiencia' }))
@@ -87,6 +138,7 @@ describe('App', () => {
   })
 
   it('muestra cupos y filtra reservas por estado', () => {
+    setRoleSession('OPERADOR')
     const { unmount } = renderAt('/operador/calendario')
     expect(screen.getByRole('heading', { name: 'Cupos' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /agregar fecha/i })).toBeInTheDocument()
@@ -100,6 +152,7 @@ describe('App', () => {
   })
 
   it('incluye las secciones de reseñas y configuración del operador', () => {
+    setRoleSession('OPERADOR')
     const { unmount } = renderAt('/operador/resenas')
     expect(screen.getByRole('heading', { name: 'Reseñas' })).toBeInTheDocument()
     expect(screen.getByText(/una experiencia increíble/i)).toBeInTheDocument()

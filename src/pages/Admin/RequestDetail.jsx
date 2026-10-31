@@ -1,18 +1,23 @@
-import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import AdminCard from '../../components/admin/AdminCard.jsx'
 import Dialog from '../../components/admin/Dialog.jsx'
 import Notice from '../../components/admin/Notice.jsx'
 import Pill from '../../components/admin/Pill.jsx'
 import Button from '../../components/Button.jsx'
 import LinkButton from '../../components/LinkButton.jsx'
-import { operatorRequests } from '../../data/admin.js'
-
-const statusPills = {
-  pendiente: { tone: 'pending', label: 'Pendiente' },
-  aprobada: { tone: 'success', label: 'Aprobada' },
-  rechazada: { tone: 'danger', label: 'Rechazada' },
-}
+import {
+  DocumentTypeLabels,
+  extractBackendErrorMessage,
+  formatShortDate,
+  getOperatorRequests,
+  normalizeOperatorRequest,
+  OperatorRequestDocumentType,
+  OperatorRequestStatus,
+  resolveDocumentImageUrl,
+  reviewOperatorRequest,
+  StatusMeta,
+} from '../../lib/operatorRequests.js'
 
 function Field({ label, children }) {
   return (
@@ -23,27 +28,139 @@ function Field({ label, children }) {
   )
 }
 
-function Photo({ caption, file }) {
+function DocumentItem({ document, onPreview }) {
+  const [imageError, setImageError] = useState(false)
+  const typeKey = String(document.type || 'OTRO').toUpperCase()
+  const label = DocumentTypeLabels[typeKey] || typeKey
+  const reference = document.objectKey || document.url || 'Documento adjunto'
+  const isSocialLink = typeKey === OperatorRequestDocumentType.ENLACE_REDES
+  const imageUrl = resolveDocumentImageUrl(document)
+
   return (
-    <figure>
-      <figcaption className="mb-2 text-sm font-bold text-ink">{caption}</figcaption>
-      <div
-        role="img"
-        aria-label={`${caption} (vista de ejemplo)`}
-        className="h-36 rounded-xl bg-linear-to-br from-[#bfe3ea] to-brand"
-      />
-      <p className="mt-1.5 text-xs text-brand">{file} · Ver en grande</p>
-    </figure>
+    <div className="flex flex-col justify-between rounded-xl border border-mist bg-canvas p-3">
+      <div>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs font-bold text-ink">{label}</span>
+          <Pill tone="info">{typeKey}</Pill>
+        </div>
+
+        {isSocialLink && document.url ? (
+          <a
+            href={document.url}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2 block truncate text-xs font-semibold text-brand hover:underline"
+          >
+            {document.url}
+          </a>
+        ) : imageUrl && !imageError ? (
+          <div className="mt-3 overflow-hidden rounded-lg border border-mist bg-white">
+            <button
+              type="button"
+              onClick={() => onPreview?.({ label, imageUrl, reference })}
+              className="group relative block w-full text-left focus:outline-none"
+              title="Haz clic para ampliar la imagen"
+            >
+              <img
+                src={imageUrl}
+                alt={label}
+                onError={() => setImageError(true)}
+                className="h-44 w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
+              />
+              <span className="absolute right-2 bottom-2 rounded-md bg-black/65 px-2 py-1 text-[11px] font-semibold text-white">
+                Ampliar
+              </span>
+            </button>
+          </div>
+        ) : (
+          <div className="mt-3 rounded-lg border border-dashed border-mist bg-white/70 p-3 text-xs text-muted">
+            No se pudo cargar la vista previa de esta imagen. Si fue adjuntada antes de habilitar el
+            almacenamiento, el solicitante puede volver a subirla desde «Modificar solicitud».
+          </div>
+        )}
+      </div>
+
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <p className="truncate text-xs text-muted" title={reference}>
+          {reference}
+        </p>
+        {imageUrl && !imageError && (
+          <a
+            href={imageUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="shrink-0 text-xs font-semibold text-brand hover:underline"
+          >
+            Abrir
+          </a>
+        )}
+      </div>
+    </div>
   )
 }
 
 function RequestDetail() {
   const { id } = useParams()
-  const request = operatorRequests.find((item) => item.id === id)
-  const [status, setStatus] = useState('pendiente')
-  const [reason, setReason] = useState('')
+  const location = useLocation()
+  const initialFromState =
+    location.state?.request && String(location.state.request.id) === String(id)
+      ? normalizeOperatorRequest(location.state.request)
+      : null
+
+  const [request, setRequest] = useState(initialFromState)
+  const [loading, setLoading] = useState(!initialFromState)
+  const [reason, setReason] = useState(initialFromState?.rejectionReason || '')
   const [reasonError, setReasonError] = useState('')
+  const [actionError, setActionError] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [dialog, setDialog] = useState(null)
+  const [justReviewed, setJustReviewed] = useState(null)
+  const [previewDoc, setPreviewDoc] = useState(null)
+
+  useEffect(() => {
+    let active = true
+
+    async function fetchDetail() {
+      if (!initialFromState) {
+        setLoading(true)
+      }
+      try {
+        const paged = await getOperatorRequests({ pageNumber: 1, pageSize: 100 })
+        if (!active) return
+        const match = paged.data.find((item) => String(item.id) === String(id))
+        if (match) {
+          setRequest(match)
+          if (match.rejectionReason) {
+            setReason(match.rejectionReason)
+          }
+        } else if (!initialFromState) {
+          setRequest(null)
+        }
+      } catch {
+        if (active && !initialFromState) {
+          setRequest(null)
+        }
+      } finally {
+        if (active) {
+          setLoading(false)
+        }
+      }
+    }
+
+    fetchDetail()
+
+    return () => {
+      active = false
+    }
+  }, [id, initialFromState])
+
+  if (loading) {
+    return (
+      <section role="status" className="py-12 text-center text-sm text-muted">
+        Cargando detalle de la solicitud...
+      </section>
+    )
+  }
 
   if (!request) {
     return (
@@ -57,30 +174,82 @@ function RequestDetail() {
     )
   }
 
-  const resolved = status !== 'pendiente'
-  const pill = statusPills[status]
+  const status = request.status || OperatorRequestStatus.PENDIENTE
+  const resolved = status !== OperatorRequestStatus.PENDIENTE
+  const pill = StatusMeta[status] ?? StatusMeta.PENDIENTE
+  const documents = Array.isArray(request.documents) ? request.documents : []
 
   function openReject() {
-    if (!reason.trim()) {
+    const trimmed = reason.trim()
+    if (!trimmed) {
       setReasonError('Escribe un motivo para poder rechazar.')
+      return
+    }
+    if (trimmed.length > 500) {
+      setReasonError('El motivo del rechazo no puede exceder 500 caracteres.')
       return
     }
     setReasonError('')
+    setActionError('')
     setDialog('reject')
   }
 
-  function confirmApprove() {
-    setStatus('aprobada')
-    setDialog(null)
+  async function confirmApprove() {
+    setIsSubmitting(true)
+    setActionError('')
+    try {
+      const updated = await reviewOperatorRequest(request.id, {
+        isApproved: true,
+        rejectionReason: null,
+      })
+      setRequest(updated)
+      setJustReviewed('APROBADA')
+      setDialog(null)
+    } catch (error) {
+      setActionError(
+        extractBackendErrorMessage(
+          error,
+          'No se pudo aprobar la solicitud de operador.',
+        ),
+      )
+      setDialog(null)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
-  function confirmReject() {
-    if (!reason.trim()) {
+  async function confirmReject() {
+    const trimmed = reason.trim()
+    if (!trimmed) {
       setReasonError('Escribe un motivo para poder rechazar.')
       return
     }
-    setStatus('rechazada')
-    setDialog(null)
+    if (trimmed.length > 500) {
+      setReasonError('El motivo del rechazo no puede exceder 500 caracteres.')
+      return
+    }
+
+    setIsSubmitting(true)
+    setActionError('')
+    try {
+      const updated = await reviewOperatorRequest(request.id, {
+        isApproved: false,
+        rejectionReason: trimmed,
+      })
+      setRequest(updated)
+      setJustReviewed('RECHAZADA')
+      setDialog(null)
+    } catch (error) {
+      setActionError(
+        extractBackendErrorMessage(
+          error,
+          'No se pudo rechazar la solicitud de operador.',
+        ),
+      )
+      setDialog(null)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -100,13 +269,19 @@ function RequestDetail() {
         </p>
       </header>
 
-      {status === 'aprobada' && (
+      {actionError && <Notice tone="warning">{actionError}</Notice>}
+
+      {status === OperatorRequestStatus.APROBADA && (
         <Notice tone="success">
-          Solicitud aprobada. Se envió un correo a {request.name}.
+          Solicitud aprobada. Se envió un correo a {request.name} y su rol pasó a{' '}
+          {request.userRole || 'OPERADOR'}.
         </Notice>
       )}
-      {status === 'rechazada' && (
-        <Notice tone="warning">Solicitud rechazada. Se notificó al solicitante.</Notice>
+      {status === OperatorRequestStatus.RECHAZADA && (
+        <Notice tone="warning">
+          Solicitud rechazada. Se notificó al solicitante.
+          {request.rejectionReason ? ` Motivo: ${request.rejectionReason}` : ''}
+        </Notice>
       )}
 
       <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
@@ -115,11 +290,12 @@ function RequestDetail() {
             <dl className="grid gap-4 sm:grid-cols-2">
               <Field label="Nombre">{request.name}</Field>
               <Field label="Correo">{request.email}</Field>
-              <Field label="Registrado desde">{request.registeredAt}</Field>
+              <Field label="Teléfono">{request.userPhone}</Field>
+              <Field label="Rol del usuario">{request.userRole}</Field>
               <div>
-                <dt className="text-xs text-muted">Correo</dt>
+                <dt className="text-xs text-muted">Estado de cuenta</dt>
                 <dd className="mt-1">
-                  <Pill tone="success">✓ Verificado</Pill>
+                  <Pill tone="success">{request.userStatus}</Pill>
                 </dd>
               </div>
             </dl>
@@ -127,48 +303,61 @@ function RequestDetail() {
 
           <AdminCard title="Datos del negocio">
             <dl className="grid gap-4 sm:grid-cols-2">
-              <Field label="Nombre del negocio">{request.business}</Field>
-              <Field label="Tipo de servicio">{request.service}</Field>
-              <Field label="Zona">{request.zone}</Field>
+              <Field label="Nombre comercial">{request.tradeName}</Field>
+              <Field label="Razón social">{request.legalName || 'No especificada'}</Field>
+              <Field label="Correo de contacto">{request.contactEmail}</Field>
               <Field label="Teléfono">{request.phone}</Field>
+              {request.whatsapp && <Field label="WhatsApp">{request.whatsapp}</Field>}
+              {request.municipalityId && (
+                <Field label="Municipio ID">{request.municipalityId}</Field>
+              )}
               <Field label="Dirección">{request.address}</Field>
+              <Field label="Estado de la empresa">{request.companyStatus}</Field>
             </dl>
             <p className="mt-4 text-xs text-muted">Descripción</p>
             <p className="mt-0.5 text-sm text-ink">{request.description}</p>
+            {request.message && (
+              <>
+                <p className="mt-4 text-xs text-muted">Mensaje del solicitante</p>
+                <p className="mt-0.5 text-sm text-ink">{request.message}</p>
+              </>
+            )}
           </AdminCard>
 
           <AdminCard title="Documentos y evidencias">
             <p className="rounded-lg bg-info-soft px-3 py-2 text-xs text-brand">
-              Archivos privados · el enlace de cada imagen es temporal y solo lo ves tú como
-              administrador.
+              Archivos privados · revisa los documentos adjuntos a la solicitud.
             </p>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <Photo caption="Foto del DUI" file="dui.jpg" />
-              <Photo caption="Foto del negocio" file="negocio.jpg" />
+            <div className="mt-4 flex items-center gap-2">
+              <h3 className="text-sm font-bold text-ink">Documentos de respaldo</h3>
+              <Pill tone="info">{documents.length} documento(s)</Pill>
             </div>
-            <div className="mt-5 flex items-center gap-2">
-              <h3 className="text-sm font-bold text-ink">Evidencias de la actividad</h3>
-              <Pill tone="info">3 imágenes</Pill>
-            </div>
-            <div className="mt-3 grid grid-cols-3 gap-3">
-              {[1, 2, 3].map((number) => (
-                <div
-                  key={number}
-                  role="img"
-                  aria-label={`Evidencia ${number} (vista de ejemplo)`}
-                  className="h-24 rounded-xl bg-linear-to-br from-[#bfe3ea] to-brand"
-                />
-              ))}
-            </div>
-            <p className="mt-4 text-xs text-muted">Enlace a redes o sitio web</p>
-            <a
-              href={request.link}
-              target="_blank"
-              rel="noreferrer"
-              className="text-sm font-semibold text-brand"
-            >
-              {request.link}
-            </a>
+            {documents.length === 0 ? (
+              <p className="mt-3 text-xs text-muted">No hay documentos registrados.</p>
+            ) : (
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                {documents.map((doc) => (
+                  <DocumentItem
+                    key={doc.id || `${doc.type}-${doc.objectKey || doc.url}`}
+                    document={doc}
+                    onPreview={setPreviewDoc}
+                  />
+                ))}
+              </div>
+            )}
+            {request.website && (
+              <>
+                <p className="mt-4 text-xs text-muted">Enlace a redes o sitio web</p>
+                <a
+                  href={request.website}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-sm font-semibold text-brand"
+                >
+                  {request.website}
+                </a>
+              </>
+            )}
           </AdminCard>
         </div>
 
@@ -180,8 +369,11 @@ function RequestDetail() {
             </p>
             <Button
               className="mt-4 w-full"
-              disabled={resolved}
-              onClick={() => setDialog('approve')}
+              disabled={resolved || isSubmitting}
+              onClick={() => {
+                setActionError('')
+                setDialog('approve')
+              }}
             >
               Aprobar solicitud
             </Button>
@@ -197,7 +389,7 @@ function RequestDetail() {
                 id="reject-reason"
                 rows="3"
                 value={reason}
-                disabled={resolved}
+                disabled={resolved || isSubmitting}
                 aria-invalid={Boolean(reasonError)}
                 aria-describedby={reasonError ? 'reject-reason-error' : undefined}
                 onChange={(event) => {
@@ -214,7 +406,7 @@ function RequestDetail() {
               )}
               <button
                 type="button"
-                disabled={resolved}
+                disabled={resolved || isSubmitting}
                 onClick={openReject}
                 className="mt-3 w-full rounded-xl border border-danger px-5 py-2.5 text-sm font-semibold text-danger transition-colors hover:bg-danger-soft focus:outline-none focus-visible:ring-2 focus-visible:ring-danger/40 disabled:opacity-50"
               >
@@ -226,9 +418,21 @@ function RequestDetail() {
           <AdminCard title="Historial">
             <ul className="space-y-1 text-xs text-muted">
               <li>• {request.sentShort} · Solicitud enviada</li>
-              <li>• {request.sentShort} · Pendiente de revisión</li>
-              {status === 'aprobada' && <li>• Ahora · Solicitud aprobada</li>}
-              {status === 'rechazada' && <li>• Ahora · Solicitud rechazada</li>}
+              {status === OperatorRequestStatus.PENDIENTE && (
+                <li>• {request.sentShort} · Pendiente de revisión</li>
+              )}
+              {status === OperatorRequestStatus.APROBADA && (
+                <li>
+                  • {justReviewed === 'APROBADA' ? 'Ahora' : formatShortDate(request.reviewedAt)} ·
+                  Solicitud aprobada
+                </li>
+              )}
+              {status === OperatorRequestStatus.RECHAZADA && (
+                <li>
+                  • {justReviewed === 'RECHAZADA' ? 'Ahora' : formatShortDate(request.reviewedAt)} ·
+                  Solicitud rechazada
+                </li>
+              )}
             </ul>
           </AdminCard>
         </div>
@@ -241,10 +445,16 @@ function RequestDetail() {
             enviará un correo de confirmación.
           </p>
           <div className="mt-6 grid grid-cols-2 gap-3">
-            <Button variant="outline" onClick={() => setDialog(null)}>
+            <Button
+              variant="outline"
+              disabled={isSubmitting}
+              onClick={() => setDialog(null)}
+            >
               Cancelar
             </Button>
-            <Button onClick={confirmApprove}>Sí, aprobar</Button>
+            <Button disabled={isSubmitting} onClick={confirmApprove}>
+              {isSubmitting ? 'Aprobando...' : 'Sí, aprobar'}
+            </Button>
           </div>
         </Dialog>
       )}
@@ -264,6 +474,7 @@ function RequestDetail() {
             id="dialog-reason"
             rows="3"
             value={reason}
+            disabled={isSubmitting}
             aria-invalid={Boolean(reasonError)}
             onChange={(event) => {
               setReason(event.target.value)
@@ -277,16 +488,47 @@ function RequestDetail() {
             </p>
           )}
           <div className="mt-6 grid grid-cols-2 gap-3">
-            <Button variant="outline" onClick={() => setDialog(null)}>
+            <Button
+              variant="outline"
+              disabled={isSubmitting}
+              onClick={() => setDialog(null)}
+            >
               Cancelar
             </Button>
             <button
               type="button"
+              disabled={isSubmitting}
               onClick={confirmReject}
-              className="rounded-xl bg-danger px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-danger/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-danger/40"
+              className="rounded-xl bg-danger px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-danger/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-danger/40 disabled:opacity-50"
             >
-              Rechazar solicitud
+              {isSubmitting ? 'Rechazando...' : 'Rechazar solicitud'}
             </button>
+          </div>
+        </Dialog>
+      )}
+
+      {previewDoc && (
+        <Dialog title={previewDoc.label} onClose={() => setPreviewDoc(null)}>
+          <div className="mt-3 overflow-hidden rounded-xl border border-mist bg-canvas">
+            <img
+              src={previewDoc.imageUrl}
+              alt={previewDoc.label}
+              className="max-h-[70vh] w-full object-contain"
+            />
+          </div>
+          <p className="mt-2 truncate text-xs text-muted">{previewDoc.reference}</p>
+          <div className="mt-4 flex justify-end gap-2">
+            <a
+              href={previewDoc.imageUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-xl border border-mist px-4 py-2 text-xs font-semibold text-brand hover:bg-canvas"
+            >
+              Abrir en pestaña nueva
+            </a>
+            <Button variant="outline" onClick={() => setPreviewDoc(null)}>
+              Cerrar
+            </Button>
           </div>
         </Dialog>
       )}
