@@ -1,4 +1,4 @@
-import { Outlet, Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { GoogleOAuthProvider } from '@react-oauth/google'
 import { AuthProvider } from './context/AuthContext.jsx'
 import AdminLayout from './layouts/AdminLayout.jsx'
@@ -21,6 +21,7 @@ import OperatorExperiences from './pages/Operators/OperatorExperiences.jsx'
 import OperatorLayout from './pages/Operators/OperatorLayout.jsx'
 import OperatorReservations from './pages/Operators/OperatorReservations.jsx'
 import OperatorReviews from './pages/Operators/OperatorReviews.jsx'
+import OperatorSettings from './pages/Operators/OperatorSettings.jsx'
 
 const googleClientId =
   import.meta.env.VITE_GOOGLE_CLIENT_ID || 'GOOGLE_CLIENT_ID_PLACEHOLDER'
