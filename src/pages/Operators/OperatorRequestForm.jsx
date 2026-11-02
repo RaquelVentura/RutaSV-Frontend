@@ -11,7 +11,6 @@ import {
   updateOperatorRequest,
   uploadOperatorRequestDocument,
 } from '../../lib/operatorRequests.js'
-import './OperatorRequestForm.css'
 
 const initialBusiness = {
   name: '',
@@ -110,7 +109,7 @@ function UploadIcon() {
   return (
     <svg
       aria-hidden="true"
-      className="operator-request__upload-icon"
+      className="h-8 w-8 text-stone-400 group-hover:text-stone-600 transition-colors"
       viewBox="0 0 24 24"
       fill="none"
     >
@@ -128,7 +127,7 @@ function UploadIcon() {
 function ErrorMessage({ id, children }) {
   if (!children) return null
   return (
-    <p className="operator-request__error" id={id} role="alert">
+    <p className="mt-1 text-xs font-medium text-red-600" id={id} role="alert">
       {children}
     </p>
   )
@@ -146,8 +145,10 @@ function TextField({
 }) {
   const errorId = `${id}-error`
   return (
-    <div className="operator-request__field">
-      <label htmlFor={id}>{label}</label>
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={id} className="text-sm font-semibold text-stone-700">
+        {label}
+      </label>
       <input
         autoComplete="off"
         aria-invalid={Boolean(error)}
@@ -158,6 +159,11 @@ function TextField({
         placeholder={placeholder}
         type={type}
         value={value}
+        className={`w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm text-stone-900 placeholder-stone-400 outline-none transition focus:ring-2 ${
+          error
+            ? 'border-red-400 focus:border-red-500 focus:ring-red-100'
+            : 'border-stone-300 focus:border-[#087E9A] focus:ring-cyan-50'
+        }`}
       />
       <ErrorMessage id={errorId}>{error}</ErrorMessage>
     </div>
@@ -167,42 +173,54 @@ function TextField({
 function FileUpload({ id, title, hint, file, error, onChange, onRemove }) {
   const errorId = `${id}-error`
   return (
-    <div className="operator-request__field">
-      <div className="operator-request__upload-heading">
-        <label htmlFor={id}>{title}</label>
-        <span className="operator-request__optional">Opcional por ahora</span>
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center justify-between text-sm">
+        <label htmlFor={id} className="font-semibold text-stone-700">
+          {title}
+        </label>
+        <span className="text-xs font-normal text-stone-400">Opcional por ahora</span>
       </div>
       <input
         accept="image/jpeg,image/png"
         aria-describedby={error ? errorId : undefined}
         aria-label={title}
-        className="operator-request__file-input"
+        className="sr-only"
         id={id}
         onChange={onChange}
         type="file"
       />
-      <div className="operator-request__file-control">
+      <div className="relative">
         <label
-          className={`operator-request__dropzone${file ? ' has-file' : ''}`}
+          className={`group flex min-h-[110px] cursor-pointer flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed p-4 text-center transition ${
+            file
+              ? 'border-cyan-300 bg-cyan-50/30'
+              : 'border-stone-300 bg-stone-50 hover:border-[#087E9A] hover:bg-white'
+          }`}
           htmlFor={id}
         >
           {file ? (
-            <>
-              <img className="operator-request__file-preview" src={file.preview} alt="" />
-              <span className="operator-request__file-name">{file.name}</span>
-            </>
+            <div className="flex items-center gap-3">
+              <img
+                className="h-14 w-14 rounded-lg object-cover border border-stone-200 shadow-sm"
+                src={file.preview}
+                alt=""
+              />
+              <span className="max-w-[200px] truncate text-xs font-medium text-stone-700">
+                {file.name}
+              </span>
+            </div>
           ) : (
             <>
               <UploadIcon />
-              <span>Selecciona {hint}</span>
-              <small>JPG o PNG · máx. 5 MB</small>
+              <span className="text-xs font-medium text-stone-700">Selecciona {hint}</span>
+              <small className="text-[11px] text-stone-400">JPG o PNG · máx. 5 MB</small>
             </>
           )}
         </label>
         {file && (
           <button
             aria-label={`Quitar ${title.toLowerCase()}`}
-            className="operator-request__remove-file"
+            className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-stone-700 text-xs font-bold text-white shadow-md transition hover:bg-red-600"
             onClick={onRemove}
             type="button"
           >
@@ -698,35 +716,40 @@ export default function OperatorRequestForm() {
   }
 
   return (
-    <main className="operator-request">
+    <main className="min-h-screen bg-stone-50 px-4 py-8 sm:px-6 lg:px-8">
       <section
-        className="operator-request__shell"
+        className="mx-auto max-w-xl rounded-3xl border border-stone-200 bg-white p-6 shadow-sm sm:p-10"
         aria-labelledby="operator-request-title"
         ref={shellRef}
       >
-        <header className="operator-request__header">
-          <Link className="operator-request__brand" to="/">
+        <header className="mb-8 flex items-center justify-between border-b border-stone-100 pb-5">
+          <Link className="text-xl font-bold tracking-tight text-[#087E9A] hover:opacity-90" to="/">
             RutaSV
           </Link>
-          <div className="operator-request__profile" aria-label={`Perfil de ${displayName}`}>
-            <span aria-hidden="true">{initials}</span>
-            <span>{displayName}</span>
+          <div className="flex items-center gap-2.5" aria-label={`Perfil de ${displayName}`}>
+            <span
+              aria-hidden="true"
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-cyan-100 text-xs font-bold text-[#087E9A]"
+            >
+              {initials}
+            </span>
+            <span className="text-sm font-medium text-stone-700">{displayName}</span>
           </div>
         </header>
 
         <form
-          className="operator-request__content"
+          className="flex flex-col gap-5"
           noValidate
           onSubmit={step === 1 ? handleNext : handleSubmit}
           ref={formRef}
         >
-          <p className="operator-request__step">
+          <p className="text-xs font-bold tracking-wider text-cyan-700">
             PASO {step} DE 2 · {step === 1 ? 'DATOS DEL NEGOCIO' : 'DOCUMENTOS Y EVIDENCIAS'}
           </p>
-          <h1 id="operator-request-title">
+          <h1 id="operator-request-title" className="text-2xl font-bold text-stone-900">
             {step === 1 ? 'Solicita ser operador' : 'Muéstranos lo que haces'}
           </h1>
-          <p className="operator-request__intro">
+          <p className="text-sm text-stone-500">
             {step === 1
               ? 'Cuéntanos de tu negocio. Un administrador revisará tu solicitud.'
               : 'Tus documentos son privados y solo los ve el equipo de RutaSV.'}
@@ -809,8 +832,10 @@ export default function OperatorRequestForm() {
                 value={business.contactEmail}
                 error={errors.contactEmail}
               />
-              <div className="operator-request__field">
-                <label htmlFor="operator-description">Describe tu negocio y lo que ofreces</label>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="operator-description" className="text-sm font-semibold text-stone-700">
+                  Describe tu negocio y lo que ofreces
+                </label>
                 <textarea
                   aria-describedby={errors.description ? 'operator-description-error' : undefined}
                   aria-invalid={Boolean(errors.description)}
@@ -820,11 +845,18 @@ export default function OperatorRequestForm() {
                   placeholder="Cuéntanos sobre tu experiencia y los servicios que ofreces."
                   rows="3"
                   value={business.description}
+                  className={`w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm text-stone-900 placeholder-stone-400 outline-none transition focus:ring-2 ${
+                    errors.description
+                      ? 'border-red-400 focus:border-red-500 focus:ring-red-100'
+                      : 'border-stone-300 focus:border-[#087E9A] focus:ring-cyan-50'
+                  }`}
                 />
                 <ErrorMessage id="operator-description-error">{errors.description}</ErrorMessage>
               </div>
-              <div className="operator-request__field">
-                <label htmlFor="operator-message">Mensaje para el administrador (opcional)</label>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="operator-message" className="text-sm font-semibold text-stone-700">
+                  Mensaje para el administrador (opcional)
+                </label>
                 <textarea
                   aria-describedby={errors.message ? 'operator-message-error' : undefined}
                   aria-invalid={Boolean(errors.message)}
@@ -834,10 +866,15 @@ export default function OperatorRequestForm() {
                   placeholder="Ej. Contamos con guías certificados y 5 años de experiencia local."
                   rows="2"
                   value={business.message}
+                  className={`w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm text-stone-900 placeholder-stone-400 outline-none transition focus:ring-2 ${
+                    errors.message
+                      ? 'border-red-400 focus:border-red-500 focus:ring-red-100'
+                      : 'border-stone-300 focus:border-[#087E9A] focus:ring-cyan-50'
+                  }`}
                 />
                 <ErrorMessage id="operator-message-error">{errors.message}</ErrorMessage>
               </div>
-              <label className="operator-request__checkbox">
+              <label className="flex items-center gap-3 cursor-pointer py-1">
                 <input
                   checked={confirmed}
                   onChange={(event) => {
@@ -845,15 +882,19 @@ export default function OperatorRequestForm() {
                     setErrors((current) => ({ ...current, confirmed: '' }))
                   }}
                   type="checkbox"
+                  className="h-4 w-4 rounded border-stone-300 text-[#087E9A] focus:ring-[#087E9A]"
                 />
-                <span>Confirmo que los datos del negocio son verídicos.</span>
+                <span className="text-sm text-stone-700">Confirmo que los datos del negocio son verídicos.</span>
               </label>
               <ErrorMessage id="operator-confirmed-error">{errors.confirmed}</ErrorMessage>
-              <button className="operator-request__primary" type="submit">
+              <button
+                className="mt-2 w-full rounded-xl bg-[#087E9A] px-4 py-3 text-sm font-semibold text-white transition hover:bg-cyan-800 focus:outline-none"
+                type="submit"
+              >
                 Siguiente
               </button>
               <button
-                className="operator-request__cancel"
+                className="w-full text-center text-sm font-medium text-stone-500 transition hover:text-stone-800 focus:outline-none py-1"
                 onClick={() => navigate('/operador/solicitud')}
                 type="button"
               >
@@ -873,7 +914,7 @@ export default function OperatorRequestForm() {
                 onRemove={() => removeSingleFile(identityPhoto, setIdentityPhoto)}
                 title="Foto del DUI"
               />
-              <p className="operator-request__helper">
+              <p className="text-xs text-stone-500 -mt-2">
                 Solo para verificar tu identidad. Nunca se muestra públicamente.
               </p>
 
@@ -919,49 +960,55 @@ export default function OperatorRequestForm() {
                 title="Constancia o registro de turismo"
               />
 
-              <div className="operator-request__field">
-                <div className="operator-request__upload-heading">
-                  <label htmlFor="operator-evidence">Evidencias de tu actividad</label>
-                  <span className="operator-request__required">Obligatorio · mín. 1</span>
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center justify-between text-sm">
+                  <label htmlFor="operator-evidence" className="font-semibold text-stone-700">
+                    Evidencias de tu actividad
+                  </label>
+                  <span className="text-xs font-semibold text-cyan-700">Obligatorio · mín. 1</span>
                 </div>
-                <p className="operator-request__helper">
+                <p className="text-xs text-stone-500">
                   Fotos que muestran a qué te dedicas. Ej.: tu bar o barra libre en servicio,
                   una clase de surf en curso.
                 </p>
                 <input
                   accept="image/jpeg,image/png"
                   aria-label="Adjuntar evidencias de tu actividad"
-                  className="operator-request__file-input"
+                  className="sr-only"
                   id="operator-evidence"
                   multiple
                   onChange={handleEvidenceChange}
                   type="file"
                 />
-                <div className="operator-request__evidence-grid">
+                <div className="mt-2 grid grid-cols-3 gap-3 sm:grid-cols-5">
                   {evidencePhotos.map((file) => (
                     <div
-                      className="operator-request__evidence"
+                      className="group relative aspect-square overflow-hidden rounded-xl border border-stone-200"
                       key={file.preview || file.objectKey || file.name}
                     >
-                      <img src={file.preview} alt={`Evidencia: ${file.name}`} />
+                      <img src={file.preview} alt={`Evidencia: ${file.name}`} className="h-full w-full object-cover" />
                       <button
                         aria-label={`Quitar evidencia ${file.name}`}
                         onClick={() => removeEvidence(file)}
                         type="button"
+                        className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-stone-800/80 text-xs font-bold text-white transition hover:bg-red-600"
                       >
                         ×
                       </button>
                     </div>
                   ))}
                   {evidencePhotos.length < 5 && (
-                    <label className="operator-request__add-evidence" htmlFor="operator-evidence">
+                    <label
+                      className="flex aspect-square cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-stone-300 bg-stone-50 text-2xl text-stone-400 transition hover:border-[#087E9A] hover:bg-white hover:text-[#087E9A]"
+                      htmlFor="operator-evidence"
+                    >
                       <span aria-hidden="true">+</span>
                       <span className="sr-only">Agregar evidencia</span>
                     </label>
                   )}
                   {evidencePhotos.length === 0 && (
                     <label
-                      className="operator-request__add-evidence operator-request__add-evidence--secondary"
+                      className="flex aspect-square cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-stone-200 bg-stone-50 text-2xl text-stone-300 transition hover:border-stone-400"
                       htmlFor="operator-evidence"
                       aria-hidden="true"
                     >
@@ -969,16 +1016,18 @@ export default function OperatorRequestForm() {
                     </label>
                   )}
                 </div>
-                <p className="operator-request__file-count">
+                <p className="mt-1 text-xs text-stone-400">
                   {evidencePhotos.length} de 5 imágenes · adjunta al menos una
                 </p>
                 <ErrorMessage id="operator-evidence-error">{errors.evidence}</ErrorMessage>
               </div>
 
-              <div className="operator-request__field">
-                <div className="operator-request__upload-heading">
-                  <label htmlFor="operator-social-link">Enlace a redes o sitio web</label>
-                  <span className="operator-request__optional">Opcional</span>
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center justify-between text-sm">
+                  <label htmlFor="operator-social-link" className="font-semibold text-stone-700">
+                    Enlace a redes o sitio web
+                  </label>
+                  <span className="text-xs text-stone-400">Opcional</span>
                 </div>
                 <input
                   aria-describedby={errors.socialLink ? 'operator-social-link-error' : undefined}
@@ -994,36 +1043,41 @@ export default function OperatorRequestForm() {
                   placeholder="https://"
                   type="url"
                   value={socialLink}
+                  className={`w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm text-stone-900 placeholder-stone-400 outline-none transition focus:ring-2 ${
+                    errors.socialLink
+                      ? 'border-red-400 focus:border-red-500 focus:ring-red-100'
+                      : 'border-stone-300 focus:border-[#087E9A] focus:ring-cyan-50'
+                  }`}
                 />
                 <ErrorMessage id="operator-social-link-error">
                   {errors.socialLink}
                 </ErrorMessage>
               </div>
 
-              <p className="operator-request__privacy">
+              <p className="text-xs text-stone-500">
                 Tus archivos se guardan de forma privada. Solo el equipo administrador puede
                 verlos.
               </p>
               {submissionError && (
-                <p className="operator-request__error" role="alert">
+                <p className="rounded-xl bg-red-50 p-3 text-sm font-medium text-red-600" role="alert">
                   {submissionError}
                 </p>
               )}
               {submissionMessage && (
-                <p className="operator-request__notice" role="status">
+                <p className="rounded-xl bg-emerald-50 p-3 text-sm font-medium text-emerald-700" role="status">
                   {submissionMessage}
                   {createdRequest?.tradeName ? ` (${createdRequest.tradeName})` : ''}
                 </p>
               )}
               <button
-                className="operator-request__primary"
+                className="mt-2 w-full rounded-xl bg-[#087E9A] px-4 py-3 text-sm font-semibold text-white transition hover:bg-cyan-800 disabled:opacity-50 focus:outline-none"
                 disabled={isSubmitting || Boolean(createdRequest)}
                 type="submit"
               >
                 {isSubmitting ? 'Enviando solicitud...' : 'Enviar solicitud'}
               </button>
               <button
-                className="operator-request__secondary"
+                className="w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-50 disabled:opacity-50 focus:outline-none"
                 disabled={isSubmitting}
                 onClick={handleBack}
                 type="button"
