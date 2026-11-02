@@ -178,7 +178,6 @@ function FileUpload({ id, title, hint, file, error, onChange, onRemove }) {
         <label htmlFor={id} className="font-semibold text-stone-700">
           {title}
         </label>
-        <span className="text-xs font-normal text-stone-400">Opcional por ahora</span>
       </div>
       <input
         accept="image/jpeg,image/png"
