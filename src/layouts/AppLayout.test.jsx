@@ -55,8 +55,8 @@ describe('AppLayout', () => {
 
     fireEvent.click(menuTrigger)
 
-    expect(screen.getByRole('menuitem', { name: /editar perfil/i })).toBeInTheDocument()
-    expect(screen.getByRole('menuitem', { name: /solicitud de operador/i })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /mi perfil/i })).toHaveAttribute('href', '/perfil')
+    expect(screen.queryByRole('menuitem', { name: /solicitud de operador/i })).not.toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: /verificar correo/i })).toHaveAttribute(
       'href',
       '/verify-email',
@@ -93,8 +93,8 @@ describe('AppLayout', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /juan perez/i }))
 
-    expect(screen.getByRole('menuitem', { name: /editar perfil/i })).toBeInTheDocument()
-    expect(screen.getByRole('menuitem', { name: /solicitud de operador/i })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /mi perfil/i })).toHaveAttribute('href', '/perfil')
+    expect(screen.queryByRole('menuitem', { name: /solicitud de operador/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('menuitem', { name: /verificar correo/i })).not.toBeInTheDocument()
   })
 

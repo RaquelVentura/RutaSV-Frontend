@@ -25,6 +25,7 @@ import OperatorRequestForm from './pages/Operators/OperatorRequestForm.jsx'
 import OperatorReservations from './pages/Operators/OperatorReservations.jsx'
 import OperatorReviews from './pages/Operators/OperatorReviews.jsx'
 import OperatorSettings from './pages/Operators/OperatorSettings.jsx'
+import Profile from './pages/Profile/Profile.jsx'
 
 function AppRoutes() {
   return (
@@ -99,6 +100,11 @@ function AppRoutes() {
             path="/operador/solicitud/formulario"
             element={<OperatorRequestForm />}
           />
+        </Route>
+
+        {/* Perfil de la cuenta: cualquier usuario autenticado */}
+        <Route element={<ProtectedRoute />}>
+          <Route path="/perfil" element={<Profile />} />
         </Route>
 
         <Route path="/sin-permiso" element={<Forbidden />} />
