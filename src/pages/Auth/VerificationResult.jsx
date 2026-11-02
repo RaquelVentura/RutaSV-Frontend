@@ -1,6 +1,8 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import Button from '../../components/Button'
 
 export default function VerificationResult({ accepted }) {
+  const navigate = useNavigate()
   const title = accepted ? '¡Correo verificado!' : 'No se pudo verificar'
   const description = accepted
     ? 'El código fue aceptado y tu correo quedó verificado.'
@@ -20,19 +22,13 @@ export default function VerificationResult({ accepted }) {
       <p className="mt-2 text-sm text-stone-600">{description}</p>
       <div className="mt-7 flex flex-col gap-3">
         {accepted ? (
-          <Link
-            to="/login"
-            className="rounded-xl bg-[#087E9A] px-4 py-3 text-sm font-semibold text-white transition hover:bg-cyan-800"
-          >
+          <Button onClick={() => navigate('/login')}>
             Ir a iniciar sesión
-          </Link>
+          </Button>
         ) : (
-          <Link
-            to="/registro"
-            className="rounded-xl bg-[#087E9A] px-4 py-3 text-sm font-semibold text-white transition hover:bg-cyan-800"
-          >
+          <Button onClick={() => navigate('/registro')}>
             Intentar de nuevo
-          </Link>
+          </Button>
         )}
         <Link to="/" className="py-2 text-sm font-medium text-[#087E9A] hover:underline">
           Volver al inicio
