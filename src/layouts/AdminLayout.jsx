@@ -1,13 +1,14 @@
 import { Link, NavLink, Outlet, useMatch } from 'react-router-dom'
 import Container from '../components/Container.jsx'
 import SearchInput from '../components/admin/SearchInput.jsx'
+import UserMenu from '../components/UserMenu.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 
 const navClass = ({ isActive }) =>
   `text-sm font-medium hover:text-brand ${isActive ? 'text-brand' : 'text-ink'}`
 
 function AdminLayout() {
-  const { user } = useAuth()
+  const { user, logout } = useAuth()
   const isDashboard = useMatch({ path: '/admin', end: true })
   const adminName = user?.role === 'ADMIN' && user?.name ? user.name : 'RutaSV'
 
@@ -40,9 +41,14 @@ function AdminLayout() {
 
           <div className="ml-auto flex items-center gap-4 md:ml-0">
             <span className="hidden text-xs font-semibold text-brand sm:inline">ES / EN ▾</span>
-            <span className="rounded-full bg-info-soft px-4 py-2 text-xs font-bold text-brand">
-              ADMIN {adminName}
-            </span>
+            <UserMenu
+              label={`ADMIN ${adminName}`}
+              items={[
+                { to: '/perfil', label: 'Mi perfil' },
+                { to: '/', label: 'Ver sitio' },
+              ]}
+              onLogout={logout}
+            />
           </div>
         </nav>
       </header>

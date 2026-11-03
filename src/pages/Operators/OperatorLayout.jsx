@@ -1,4 +1,5 @@
 import { Link, NavLink, Outlet } from 'react-router-dom'
+import UserMenu from '../../components/UserMenu.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 
 const navigation = [
@@ -29,7 +30,7 @@ function NavigationLink({ item }) {
 }
 
 function OperatorLayout() {
-  const { user } = useAuth()
+  const { user, logout } = useAuth()
   const operatorName =
     user?.businessName || user?.business_name || 'Olas de El Tunco'
 
@@ -40,14 +41,16 @@ function OperatorLayout() {
           <Link to="/" className="text-[28px] font-extrabold tracking-tight text-brand">
             RutaSV
           </Link>
-          <Link
-            to="/operador/configuracion"
-            className="max-w-[65%] truncate rounded-full bg-[#eaf5f6] px-3 py-2 text-xs font-semibold text-[#287987] md:max-w-xs"
-            aria-label={`Operador: ${operatorName}`}
-          >
-            OT · {operatorName}
-            <span aria-hidden="true" className="ml-1">⌄</span>
-          </Link>
+          <UserMenu
+            label={`OT · ${operatorName}`}
+            items={[
+              { to: '/operador/configuracion', label: 'Configuración del negocio' },
+              { to: '/perfil', label: 'Mi perfil' },
+              { to: '/', label: 'Ver sitio' },
+            ]}
+            onLogout={logout}
+            className="max-w-[65%] md:max-w-xs"
+          />
         </header>
 
         <main className="px-5 pb-10 pt-7 md:px-8 md:pt-9 lg:px-10">

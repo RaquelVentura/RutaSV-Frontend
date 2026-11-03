@@ -123,23 +123,13 @@ export default function AppLayout({ user: propUser, onLogout, children }) {
                   className="absolute right-0 z-50 mt-2 w-56 rounded-2xl border border-stone-200 bg-white py-2 shadow-lg"
                 >
                   <Link
-                    to="/perfil/editar"
+                    to="/perfil"
                     role="menuitem"
                     onClick={closeMenu}
                     className="block px-4 py-2.5 text-sm text-stone-700 hover:bg-stone-50 hover:text-[#087E9A]"
                   >
-                    Editar perfil
+                    Mi perfil
                   </Link>
-                  {(!currentUser?.role || currentUser?.role === 'VISITANTE') && (
-                    <Link
-                      to="/operador/solicitud"
-                      role="menuitem"
-                      onClick={closeMenu}
-                      className="block px-4 py-2.5 text-sm text-stone-700 hover:bg-stone-50 hover:text-[#087E9A]"
-                    >
-                      Solicitud de Operador
-                    </Link>
-                  )}
                   {(currentUser?.role === 'OPERADOR' ||
                     currentUser?.role === 'ADMIN') && (
                     <Link
