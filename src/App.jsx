@@ -16,7 +16,7 @@ const googleClientId =
 function AppContent() {
   const { pathname } = useLocation()
 
-  if (pathname === '/operador/solicitud') {
+  if (pathname === '/operador/solicitud' || pathname === '/solicitar-operador') {
     return <OperatorRequestForm />
   }
 

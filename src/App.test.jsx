@@ -29,6 +29,14 @@ describe('App', () => {
     expect(screen.getByLabelText(/nombre del negocio/i)).toBeInTheDocument()
   })
 
+  it('muestra el formulario de solicitud en /solicitar-operador', () => {
+    renderAt('/solicitar-operador')
+    expect(
+      screen.getByRole('heading', { name: /solicita ser operador/i }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('complementary', { name: /progreso de solicitud/i })).toBeInTheDocument()
+  })
+
   it('muestra el formulario de inicio de sesión en /login', () => {
     renderAt('/login')
     expect(
