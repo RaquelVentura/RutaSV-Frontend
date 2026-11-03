@@ -63,6 +63,18 @@ describe('OperatorRequestForm', () => {
     expect(screen.getByLabelText(/nombre del negocio/i)).toHaveValue('Olas del Pacífico')
   })
 
+  it('permite navegar desde los pasos laterales y valida antes de avanzar', () => {
+    renderForm()
+    const documentsStep = screen.getByRole('button', { name: /documentos y evidencias/i })
+
+    fireEvent.click(documentsStep)
+    expect(screen.getByText('Ingresa el nombre del negocio o guía.')).toBeInTheDocument()
+
+    completeBusinessDetails()
+    fireEvent.click(documentsStep)
+    expect(screen.getByRole('heading', { name: 'Muéstranos lo que haces' })).toBeInTheDocument()
+  })
+
   it('requiere una evidencia y no presenta la solicitud como enviada sin backend', () => {
     renderForm()
     completeBusinessDetails()

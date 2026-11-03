@@ -36,6 +36,8 @@ function AppContent() {
         <OperatorRequestForm />
       </AppLayout>
     )
+  } else if (pathname === '/solicitar-operador') {
+    return <OperatorRequestForm />
   } else if (pathname.startsWith('/operador')) {
     return (
       <Routes>
