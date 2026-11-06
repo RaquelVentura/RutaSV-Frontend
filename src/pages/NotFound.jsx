@@ -1,15 +1,13 @@
-import { Link } from 'react-router-dom'
+import LinkButton from '../components/LinkButton.jsx'
 
 function NotFound() {
   return (
     <section>
-      <h1 className="text-3xl font-bold">Página no encontrada</h1>
-      <p className="mt-2 text-stone-600">
-        La ruta que buscas no existe.{' '}
-        <Link to="/" className="text-orange-700 underline">
-          Volver al inicio
-        </Link>
-      </p>
+      <h1 className="text-3xl font-extrabold text-ink">Página no encontrada</h1>
+      <p className="mt-2 text-muted">La ruta que buscas no existe.</p>
+      <LinkButton to="/" className="mt-6">
+        Volver al inicio
+      </LinkButton>
     </section>
   )
 }

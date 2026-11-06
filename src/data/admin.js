@@ -1,0 +1,118 @@
+// Datos estáticos de las vistas de administración. El backend los reemplazará.
+
+export const adminStats = [
+  { label: 'Solicitudes pendientes', value: 5, note: 'Requieren tu revisión', tone: 'pending' },
+  { label: 'Usuarios nuevos', value: 12, note: 'Esta semana', tone: 'info' },
+  { label: 'Empresas activas', value: 38, note: 'Operadores aprobados', tone: 'success' },
+  { label: 'Experiencias por revisar', value: 7, note: 'Pendientes de moderación', tone: 'info' },
+]
+
+export const adminActivity = [
+  { title: 'Usuario nuevo registrado', detail: 'Carlos Pineda · Hoy 17:30' },
+  { title: 'Correo de bienvenida enviado', detail: 'carlos.pineda@correo.com · Hoy 17:30' },
+  { title: 'Solicitud aprobada', detail: 'Surf School Costa · Ayer 10:12' },
+]
+
+export const operatorRequests = [
+  {
+    id: 'josue-antonio',
+    order: 5,
+    name: 'Josue Antonio',
+    email: 'josue.antonio@correo.com',
+    registeredAt: '02 nov 2026',
+    sentAt: 'Hoy · 15:25',
+    sentLong: '21 nov 2026 a las 15:25',
+    sentShort: '21 nov · 15:25',
+    business: 'Ecoparque El Espino',
+    service: 'Parque ecológico',
+    zone: 'Zona Central',
+    phone: '2328 8023',
+    address: 'Blvr. Sta. Elena 20',
+    description:
+      'Bosque en las pendientes de un volcán con avifauna, vistas panorámicas, senderos de excursión y ciclismo.',
+    link: 'https://instagram.com/ecoparqueelespino',
+  },
+  {
+    id: 'marta-rivas',
+    order: 4,
+    name: 'Marta Rivas',
+    email: 'marta.rivas@correo.com',
+    registeredAt: '28 oct 2026',
+    sentAt: 'Hoy · 11:02',
+    sentLong: '21 nov 2026 a las 11:02',
+    sentShort: '21 nov · 11:02',
+    business: 'Café La Montaña',
+    service: 'Gastronomía',
+    zone: 'Zona Occidental',
+    phone: '2400 1122',
+    address: 'Calle Principal 5, Juayúa',
+    description: 'Café de altura con catas guiadas y recorrido por la finca.',
+    link: 'https://instagram.com/cafelamontana',
+  },
+  {
+    id: 'luis-carcamo',
+    order: 3,
+    name: 'Luis Cárcamo',
+    email: 'luis.carcamo@correo.com',
+    registeredAt: '15 oct 2026',
+    sentAt: 'Ayer · 18:40',
+    sentLong: '20 nov 2026 a las 18:40',
+    sentShort: '20 nov · 18:40',
+    business: 'Surf School El Zonte',
+    service: 'Surf y deportes',
+    zone: 'La Libertad',
+    phone: '2389 0045',
+    address: 'Playa El Zonte, km 53',
+    description: 'Escuela de surf con clases para principiantes y alquiler de tablas.',
+    link: 'https://instagram.com/surfelzonte',
+  },
+  {
+    id: 'daniela-mena',
+    order: 2,
+    name: 'Daniela Mena',
+    email: 'daniela.mena@correo.com',
+    registeredAt: '10 oct 2026',
+    sentAt: '20 nov · 09:15',
+    sentLong: '20 nov 2026 a las 09:15',
+    sentShort: '20 nov · 09:15',
+    business: 'Bar Barra Libre Costa',
+    service: 'Bar y vida nocturna',
+    zone: 'La Libertad',
+    phone: '2310 7788',
+    address: 'Paseo El Sunzal 12',
+    description: 'Bar frente al mar con música en vivo los fines de semana.',
+    link: 'https://instagram.com/barlibrecosta',
+  },
+  {
+    id: 'carlos-pineda',
+    order: 1,
+    name: 'Carlos Pineda',
+    email: 'carlos.pineda@correo.com',
+    registeredAt: '05 oct 2026',
+    sentAt: '18 nov · 14:30',
+    sentLong: '18 nov 2026 a las 14:30',
+    sentShort: '18 nov · 14:30',
+    business: 'Tours Ruta de las Flores',
+    service: 'Tours guiados',
+    zone: 'Zona Occidental',
+    phone: '2455 3300',
+    address: 'Av. Central 8, Apaneca',
+    description: 'Recorridos guiados por pueblos de la Ruta de las Flores.',
+    link: 'https://instagram.com/toursflores',
+  },
+]
+
+export const users = [
+  { id: 1, name: 'Ana López', email: 'ana.lopez@correo.com', role: 'VISITANTE', status: 'Activo', registeredAt: '02 nov 2026' },
+  { id: 2, name: 'Josue Antonio', email: 'josue.antonio@correo.com', role: 'VISITANTE', status: 'Activo', registeredAt: '02 nov 2026' },
+  { id: 3, name: 'Marta Rivas', email: 'marta.rivas@correo.com', role: 'OPERADOR', status: 'Activo', registeredAt: '28 oct 2026' },
+  { id: 4, name: 'Luis Cárcamo', email: 'luis.carcamo@correo.com', role: 'OPERADOR', status: 'Suspendido', registeredAt: '15 oct 2026' },
+  { id: 5, name: 'Carlos Pineda', email: 'carlos.pineda@correo.com', role: 'VISITANTE', status: 'Sin verificar', registeredAt: 'Hoy · 17:30' },
+  { id: 6, name: 'Admin RutaSV', email: 'admin@rutasv.com', role: 'ADMIN', status: 'Activo', registeredAt: '01 oct 2026' },
+]
+
+export const roleDescriptions = [
+  { role: 'VISITANTE', text: 'Explora, reserva y califica experiencias.' },
+  { role: 'OPERADOR', text: 'Publica y gestiona sus experiencias y reservas.' },
+  { role: 'ADMIN', text: 'Gestiona usuarios, solicitudes y moderación.' },
+]
