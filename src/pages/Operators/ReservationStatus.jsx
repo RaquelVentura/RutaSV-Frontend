@@ -1,3 +1,5 @@
+//funcion para mostrar el estado de la reserva, recibe un estado y devuelve un span con el estilo correspondiente.
+
 function ReservationStatus({ status }) {
   const styles = {
     Confirmada: 'bg-success-soft text-success',

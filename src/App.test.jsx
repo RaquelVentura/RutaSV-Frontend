@@ -1,8 +1,9 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import App from './App.jsx'
 
+beforeEach(() => localStorage.clear())
 afterEach(cleanup)
 
 function renderAt(path) {
@@ -22,11 +23,12 @@ describe('App', () => {
   })
 
   it('muestra el formulario de solicitud de operador en su ruta', () => {
-    renderAt('/operador/solicitud')
+    const { container } = renderAt('/operador/solicitud')
     expect(
       screen.getByRole('heading', { name: /solicita ser operador/i }),
     ).toBeInTheDocument()
     expect(screen.getByLabelText(/nombre del negocio/i)).toBeInTheDocument()
+    expect(container.querySelectorAll('header')).toHaveLength(1)
   })
   
   it('muestra el panel del operador y permite abrir sus vistas', () => {
@@ -39,6 +41,20 @@ describe('App', () => {
         (link) => link.getAttribute('href') === '/operador/experiencias/nueva',
       ),
     ).toBe(true)
+  })
+
+  it('personaliza el resumen con el perfil activo', () => {
+    const payload = btoa(JSON.stringify({
+      sub: 'operator-a',
+      business_name: 'Volcan Tours',
+      role: 'operator',
+    }))
+    localStorage.setItem('token', `e30.${payload}.signature`)
+
+    renderAt('/operador')
+
+    expect(screen.getByText('Hola, Volcan Tours. Aquí tienes la actividad de tu negocio.')).toBeInTheDocument()
+    expect(localStorage.getItem('rutasv:operator:operator-a:experiences')).toBeNull()
   })
 
   it('permite buscar y filtrar las experiencias de muestra', () => {
@@ -55,7 +71,7 @@ describe('App', () => {
     expect(screen.queryByText('Ruta de café en Apaneca')).not.toBeInTheDocument()
   })
 
-  it('valida la publicación de experiencias e informa que aún no se guarda en backend', () => {
+  it('guarda una experiencia localmente como preparación para el backend', () => {
     renderAt('/operador/experiencias/nueva')
 
     fireEvent.click(screen.getByRole('button', { name: 'Guardar experiencia' }))
@@ -81,9 +97,35 @@ describe('App', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: 'Guardar experiencia' }))
 
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'la experiencia no se guardó porque esta vista aún no está conectada al backend',
+    expect(screen.getByRole('status')).toHaveTextContent('guardados en este navegador')
+    const savedExperiences = JSON.parse(
+      localStorage.getItem('rutasv:operator:demo:experiences'),
     )
+    expect(savedExperiences).toContainEqual(
+      expect.objectContaining({
+        title: 'Amanecer en el volcán',
+        category: 'Naturaleza',
+        location: 'Santa Ana',
+        price: 35,
+        capacity: 8,
+      }),
+    )
+  })
+
+  it('carga y guarda los cambios al editar una experiencia', () => {
+    renderAt('/operador/experiencias/nueva?editar=1')
+
+    expect(screen.getByRole('heading', { name: 'Editar experiencia' })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Nombre de la experiencia'), {
+      target: { value: 'Surf al atardecer' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    const savedExperiences = JSON.parse(
+      localStorage.getItem('rutasv:operator:demo:experiences'),
+    )
+    expect(savedExperiences.find((item) => item.id === 1).title).toBe('Surf al atardecer')
+    expect(screen.getByRole('status')).toHaveTextContent('Cambios guardados')
   })
 
   it('muestra cupos y filtra reservas por estado', () => {
@@ -99,10 +141,50 @@ describe('App', () => {
     expect(screen.queryByText('María López')).not.toBeInTheDocument()
   })
 
+  it('permite añadir una fecha, hora y cupos disponibles', () => {
+    renderAt('/operador/cupos')
+    fireEvent.click(screen.getByRole('button', { name: '+ Agregar fecha' }))
+    fireEvent.change(screen.getByLabelText('Día'), {
+      target: { value: '2026-12-10' },
+    })
+    fireEvent.change(screen.getByLabelText('Hora'), {
+      target: { value: '10:30' },
+    })
+    fireEvent.change(screen.getByLabelText('Capacidad total'), {
+      target: { value: '12' },
+    })
+    fireEvent.change(screen.getByLabelText('Cupos disponibles'), {
+      target: { value: '10' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cupos' }))
+
+    const savedAvailability = JSON.parse(
+      localStorage.getItem('rutasv:operator:demo:availability'),
+    )
+    expect(savedAvailability).toContainEqual(
+      expect.objectContaining({
+        date: '2026-12-10',
+        time: '10:30',
+        available: 10,
+        capacity: 12,
+      }),
+    )
+  })
+
   it('incluye las secciones de reseñas y configuración del operador', () => {
     const { unmount } = renderAt('/operador/resenas')
     expect(screen.getByRole('heading', { name: 'Reseñas' })).toBeInTheDocument()
     expect(screen.getByText(/una experiencia increíble/i)).toBeInTheDocument()
+    fireEvent.click(screen.getAllByRole('button', { name: 'Responder' })[0])
+    expect(screen.getAllByLabelText('Respuesta pública')[0]).toBeVisible()
+    fireEvent.change(screen.getAllByLabelText('Respuesta pública')[0], {
+      target: { value: '¡Gracias por visitarnos!' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar respuesta' }))
+    const savedReviews = JSON.parse(
+      localStorage.getItem('rutasv:operator:demo:reviews'),
+    )
+    expect(savedReviews[0].reply).toBe('¡Gracias por visitarnos!')
 
     unmount()
     renderAt('/operador/configuracion')

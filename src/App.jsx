@@ -31,11 +31,7 @@ function AppContent() {
   const { pathname } = useLocation()
 
   if (pathname === '/operador/solicitud') {
-    return (
-      <AppLayout>
-        <OperatorRequestForm />
-      </AppLayout>
-    )
+    return <OperatorRequestForm />
   } else if (pathname === '/solicitar-operador') {
     return <OperatorRequestForm />
   } else if (pathname.startsWith('/operador')) {

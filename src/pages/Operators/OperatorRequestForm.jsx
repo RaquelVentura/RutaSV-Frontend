@@ -16,10 +16,21 @@ const initialBusiness = {
 }
 
 function getDisplayName(user) {
+  const firstName = user?.given_name || user?.firstName || user?.first_name
+  const lastName = user?.family_name || user?.lastName || user?.last_name
+  const fullName = [user?.fullName, user?.full_name].find(
+    (value) => typeof value === 'string' && value.trim(),
+  )
+  const name = [firstName, lastName]
+    .filter((value) => typeof value === 'string' && value.trim())
+    .join(' ')
+
   return (
-    user?.name ||
-    [user?.given_name, user?.family_name].filter(Boolean).join(' ') ||
-    user?.email ||
+    fullName?.trim() ||
+    name ||
+    [user?.displayName, user?.display_name, user?.name, user?.email].find(
+      (value) => typeof value === 'string' && value.trim(),
+    )?.trim() ||
     'Mi perfil'
   )
 }

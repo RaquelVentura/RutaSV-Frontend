@@ -1,7 +1,11 @@
+//prueba de la solicitud para ser operador 
+
+
+
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { AuthProvider } from '../../context/AuthContext.jsx'
+import { AuthContext, AuthProvider } from '../../context/AuthContext.jsx'
 import OperatorRequestForm from './OperatorRequestForm.jsx'
 
 afterEach(cleanup)
@@ -50,6 +54,52 @@ describe('OperatorRequestForm', () => {
 
     expect(screen.getByText('Ingresa el nombre del negocio o guía.')).toBeInTheDocument()
     expect(screen.getByText('Confirma que los datos son verídicos.')).toBeInTheDocument()
+  })
+
+  it('muestra y actualiza el perfil desde los datos de sesión', () => {
+    const renderWithUser = (user) =>
+      render(
+        <MemoryRouter>
+          <AuthContext.Provider
+            value={{
+              user,
+              isAuthenticated: Boolean(user),
+              login: vi.fn(),
+              logout: vi.fn(),
+              markEmailAsVerified: vi.fn(),
+            }}
+          >
+            <OperatorRequestForm />
+          </AuthContext.Provider>
+        </MemoryRouter>,
+      )
+
+    const { rerender } = renderWithUser({
+      full_name: 'María López',
+      email: 'maria@example.com',
+    })
+
+    expect(screen.getByLabelText('Perfil de María López')).toBeInTheDocument()
+    expect(screen.getByText('ML')).toBeInTheDocument()
+
+    rerender(
+      <MemoryRouter>
+        <AuthContext.Provider
+          value={{
+            user: { first_name: 'Carlos', last_name: 'Ruiz' },
+            isAuthenticated: true,
+            login: vi.fn(),
+            logout: vi.fn(),
+            markEmailAsVerified: vi.fn(),
+          }}
+        >
+          <OperatorRequestForm />
+        </AuthContext.Provider>
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByLabelText('Perfil de Carlos Ruiz')).toBeInTheDocument()
+    expect(screen.getByText('CR')).toBeInTheDocument()
   })
 
   it('permite avanzar, volver y conserva los datos ingresados', () => {
