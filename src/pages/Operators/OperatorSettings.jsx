@@ -1,15 +1,17 @@
+//PANEL CONFIGURACÓN OPERADOR 
+
 import { useState } from 'react'
 
 const inputClass =
-  'w-full rounded-lg border border-[#dce4e5] bg-white px-3 py-2.5 text-sm text-[#203940] outline-none focus:border-[#147c91] focus:ring-2 focus:ring-[#147c91]/15'
+  'min-h-12 w-full rounded-xl border border-black/15 bg-white px-4 py-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/15'
 
 function PreferenceToggle({ id, label, defaultChecked = true }) {
   const [enabled, setEnabled] = useState(defaultChecked)
 
   return (
-    <label htmlFor={id} className="flex cursor-pointer items-center justify-between gap-3 py-3">
-      <span className="text-sm text-[#52676d]">{label}</span>
-      <span className={`relative h-6 w-11 rounded-full transition ${enabled ? 'bg-[#147c91]' : 'bg-[#cbd5d7]'}`}>
+    <label htmlFor={id} className="flex cursor-pointer items-center justify-between gap-3 border-b border-black/10 py-4 last:border-0">
+      <span className="text-sm text-muted">{label}</span>
+      <span className={`relative h-6 w-11 shrink-0 rounded-full transition ${enabled ? 'bg-brand' : 'bg-slate-300'}`}>
         <input
           id={id}
           type="checkbox"
@@ -35,82 +37,90 @@ function OperatorSettings() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="grid gap-5 lg:grid-cols-2">
+    <form onSubmit={handleSubmit} className="grid gap-6 lg:grid-cols-2 lg:gap-7">
       <div className="lg:col-span-2">
-        <h1 className="text-[26px] font-bold leading-tight text-[#203940]">Configuración</h1>
-        <p className="mt-1 text-sm leading-5 text-muted">
+        <h1 className="text-3xl font-extrabold tracking-tight text-ink">Configuración</h1>
+        <p className="mt-2 text-sm leading-6 text-muted">
           Administra el perfil, los contactos y las preferencias de tu negocio.
         </p>
       </div>
 
-      <section className="space-y-4 rounded-xl border border-[#e1e8e9] bg-white p-4 lg:col-span-2">
-        <h2 className="text-lg font-bold text-[#203940]">Editar perfil del operador</h2>
+      <section className="grid gap-5 rounded-2xl border border-black/10 bg-white p-5 shadow-sm sm:grid-cols-2 lg:col-span-2 lg:gap-6 lg:p-7">
+        <h2 className="text-lg font-bold text-ink sm:col-span-2">Editar perfil del operador</h2>
         <label className="flex items-center gap-3">
-          <span className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-[#eaf5f6] font-bold text-[#147c91]">
+          <span className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-info-soft text-lg font-bold text-brand">
             OT
           </span>
           <span>
-            <span className="block text-sm font-semibold text-[#147c91]">Agregar o cambiar imagen</span>
+            <span className="block text-sm font-semibold text-brand">Agregar o cambiar imagen</span>
             <span className="mt-1 block text-xs text-muted">JPG o PNG · Máximo 5 MB</span>
           </span>
           <input type="file" accept="image/jpeg,image/png" className="sr-only" />
         </label>
 
-        <div className="space-y-2">
-          <label htmlFor="operator-business-name" className="block text-sm font-semibold text-[#203940]">
+        <div className="grid content-center gap-2">
+          <label htmlFor="operator-business-name" className="block text-sm font-semibold text-ink">
             Nombre del negocio
           </label>
           <input id="operator-business-name" className={inputClass} defaultValue="Olas de El Tunco" />
         </div>
 
-        <div className="space-y-2">
-          <label htmlFor="operator-description" className="block text-sm font-semibold text-[#203940]">
+        <div className="grid gap-2 sm:col-span-2">
+          <label htmlFor="operator-description" className="block text-sm font-semibold text-ink">
             Descripción del operador
           </label>
           <textarea
             id="operator-description"
-            rows="3"
-            className={`${inputClass} resize-y`}
+            rows="4"
+            className={`${inputClass} min-h-28 resize-y`}
             defaultValue="Guías locales desde 2018. Compartimos nuestra pasión por el surf y la costa de El Salvador."
           />
         </div>
 
-        <div className="space-y-2">
-          <label htmlFor="operator-location" className="block text-sm font-semibold text-[#203940]">
+        <div className="grid gap-2">
+          <label htmlFor="operator-location" className="block text-sm font-semibold text-ink">
             Ubicación
           </label>
           <input id="operator-location" className={inputClass} defaultValue="El Tunco, La Libertad" />
         </div>
-        <p className="text-xs leading-5 text-muted">Esta información aparece en tu perfil público.</p>
+        <p className="self-end text-xs leading-5 text-muted">
+          Esta información aparece en tu perfil público.
+        </p>
       </section>
 
-      <section className="space-y-4 rounded-xl border border-[#e1e8e9] bg-white p-4">
-        <h2 className="text-lg font-bold text-[#203940]">Datos de contacto</h2>
-        <div className="border-b border-[#e7eded] pb-3">
-          <p className="text-sm font-semibold text-[#203940]">Correo del negocio · Principal</p>
-          <p className="mt-1 text-sm text-[#52676d]">contacto@olasdeeltunco.com</p>
-          <button type="button" className="mt-2 text-sm font-semibold text-[#147c91]">Editar</button>
+      <section className="grid content-start gap-5 rounded-2xl border border-black/10 bg-white p-5 shadow-sm lg:p-7">
+        <h2 className="text-lg font-bold text-ink">Datos de contacto</h2>
+        <div className="border-b border-black/10 pb-4">
+          <p className="text-sm font-semibold text-ink">Correo del negocio · Principal</p>
+          <p className="mt-2 text-sm text-muted">contacto@olasdeeltunco.com</p>
+          <button type="button" className="mt-3 text-sm font-semibold text-brand hover:text-brand-dark">
+            Editar
+          </button>
         </div>
         <div>
-          <p className="text-sm font-semibold text-[#203940]">WhatsApp</p>
-          <p className="mt-1 text-sm text-[#52676d]">+503 7777 2048</p>
-          <div className="mt-2 flex gap-4">
-            <button type="button" className="text-sm font-semibold text-[#147c91]">Editar</button>
-            <button type="button" className="text-sm font-semibold text-[#b42318]">Borrar</button>
+          <p className="text-sm font-semibold text-ink">WhatsApp</p>
+          <p className="mt-2 text-sm text-muted">+503 7777 2048</p>
+          <div className="mt-3 flex gap-4">
+            <button type="button" className="text-sm font-semibold text-brand hover:text-brand-dark">
+              Editar
+            </button>
+            <button type="button" className="text-sm font-semibold text-danger">
+              Borrar
+            </button>
           </div>
         </div>
         <button
           type="button"
-          className="w-full rounded-lg border border-[#dce4e5] py-2.5 text-sm font-semibold text-[#147c91] hover:bg-[#f3f8f8]"
+          className="min-h-12 w-full rounded-xl border border-black/15 text-sm font-semibold text-brand transition hover:border-brand hover:bg-info-soft"
         >
           + Agregar contacto
         </button>
       </section>
 
-      <section className="rounded-xl border border-[#e1e8e9] bg-white p-4">
-        <h2 className="text-lg font-bold text-[#203940]">Preferencias</h2>
-        <div className="border-b border-[#e7eded] py-3">
-          <label htmlFor="operator-language" className="mb-2 block text-sm font-semibold text-[#203940]">
+      <section className="rounded-2xl border border-black/10 bg-white p-5 shadow-sm lg:p-7">
+        <h2 className="text-lg font-bold text-ink">Preferencias</h2>
+        <div className="mt-4 border-b border-black/10 pb-4">
+          <label htmlFor="operator-language" className="mb-2 block text-sm font-semibold text-ink">
             Idioma del panel
           </label>
           <select id="operator-language" className={inputClass} defaultValue="Español">
@@ -118,18 +128,20 @@ function OperatorSettings() {
             <option>English</option>
           </select>
         </div>
-        <PreferenceToggle id="booking-alerts" label="Avisos de reservas" />
-        <PreferenceToggle id="review-alerts" label="Nuevas reseñas" />
+        <div className="mt-2">
+          <PreferenceToggle id="booking-alerts" label="Avisos de reservas" />
+          <PreferenceToggle id="review-alerts" label="Nuevas reseñas" />
+        </div>
       </section>
 
       {notice && (
-        <p role="status" className="rounded-lg bg-amber-50 px-4 py-3 text-sm leading-5 text-amber-900 lg:col-span-2">
+        <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-5 text-amber-900 lg:col-span-2">
           {notice}
         </p>
       )}
       <button
         type="submit"
-        className="w-full rounded-lg bg-[#147c91] px-4 py-3 text-sm font-bold text-white hover:bg-[#066a82] lg:col-span-2"
+        className="min-h-12 w-full rounded-xl bg-brand px-4 py-3 text-sm font-bold text-white transition hover:bg-brand-dark lg:col-span-2"
       >
         Guardar cambios
       </button>
