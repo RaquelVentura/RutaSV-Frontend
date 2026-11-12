@@ -12,7 +12,7 @@ const columns = [
   {
     title: 'Comunidad',
     items: [
-      { label: 'Publicar experiencia', to: '/solicitar-operador' },
+      { label: 'Publicar experiencia', to: '/operador/solicitud' },
       { label: 'Turismo responsable' },
       { label: 'Sobre RutaSV' },
     ],

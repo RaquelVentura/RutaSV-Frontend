@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { AuthProvider } from '../context/AuthContext.jsx'
-import AppLayout from './AppLayout.jsx'
+import MainLayout from './MainLayout.jsx'
 
 function createMockJwt(payload) {
   const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
@@ -25,7 +25,7 @@ afterEach(() => {
   localStorage.clear()
 })
 
-describe('AppLayout', () => {
+describe('MainLayout', () => {
   it('muestra menú desplegable de perfil para usuario autenticado no verificado con Verificar Correo y permite cerrar sesión', () => {
     const token = createMockJwt({
       sub: 'ec25601c-d3fb-41ff-a022-2b143afade36',
@@ -41,9 +41,11 @@ describe('AppLayout', () => {
     render(
       <MemoryRouter>
         <AuthProvider>
-          <AppLayout>
-            <p>Contenido de la cuenta</p>
-          </AppLayout>
+          <Routes>
+            <Route element={<MainLayout />}>
+              <Route index element={<p>Contenido de la cuenta</p>} />
+            </Route>
+          </Routes>
         </AuthProvider>
       </MemoryRouter>,
     )
@@ -84,9 +86,11 @@ describe('AppLayout', () => {
     render(
       <MemoryRouter>
         <AuthProvider>
-          <AppLayout>
-            <p>Contenido de la cuenta</p>
-          </AppLayout>
+          <Routes>
+            <Route element={<MainLayout />}>
+              <Route index element={<p>Contenido de la cuenta</p>} />
+            </Route>
+          </Routes>
         </AuthProvider>
       </MemoryRouter>,
     )
@@ -113,9 +117,11 @@ describe('AppLayout', () => {
     render(
       <MemoryRouter>
         <AuthProvider>
-          <AppLayout>
-            <p>Contenido del operador</p>
-          </AppLayout>
+          <Routes>
+            <Route element={<MainLayout />}>
+              <Route index element={<p>Contenido del operador</p>} />
+            </Route>
+          </Routes>
         </AuthProvider>
       </MemoryRouter>,
     )
@@ -125,6 +131,39 @@ describe('AppLayout', () => {
       'href',
       '/operador',
     )
+    expect(screen.queryByRole('menuitem', { name: /panel de administración/i })).not.toBeInTheDocument()
+  })
+
+  it('envía a los administradores al panel de administración y no al del operador', () => {
+    const token = createMockJwt({
+      sub: 'ec25601c-d3fb-41ff-a022-2b143afade36',
+      email: 'admin@rutasv.com',
+      given_name: 'Admin',
+      family_name: 'RutaSV',
+      'http://schemas.microsoft.com/ws/2008/06/identity/claims/role': 'ADMIN',
+      email_verified: 'true',
+      exp: 4102444800,
+    })
+    localStorage.setItem('token', token)
+
+    render(
+      <MemoryRouter>
+        <AuthProvider>
+          <Routes>
+            <Route element={<MainLayout />}>
+              <Route index element={<p>Contenido del admin</p>} />
+            </Route>
+          </Routes>
+        </AuthProvider>
+      </MemoryRouter>,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /admin rutasv/i }))
+    expect(screen.getByRole('menuitem', { name: /panel de administración/i })).toHaveAttribute(
+      'href',
+      '/admin',
+    )
+    expect(screen.queryByRole('menuitem', { name: /panel de operador/i })).not.toBeInTheDocument()
   })
 
   it('redirige a /verify-email al seleccionar Verificar Correo en el menú desplegable', () => {
@@ -141,12 +180,12 @@ describe('AppLayout', () => {
     render(
       <MemoryRouter initialEntries={['/']}>
         <AuthProvider>
-          <AppLayout>
-            <Routes>
+          <Routes>
+            <Route element={<MainLayout />}>
               <Route path="/" element={<p>Inicio</p>} />
               <Route path="/verify-email" element={<p>Vista Verificar Correo</p>} />
-            </Routes>
-          </AppLayout>
+            </Route>
+          </Routes>
         </AuthProvider>
       </MemoryRouter>,
     )
@@ -161,9 +200,11 @@ describe('AppLayout', () => {
     render(
       <MemoryRouter>
         <AuthProvider>
-          <AppLayout>
-            <p>Contenido público</p>
-          </AppLayout>
+          <Routes>
+            <Route element={<MainLayout />}>
+              <Route index element={<p>Contenido público</p>} />
+            </Route>
+          </Routes>
         </AuthProvider>
       </MemoryRouter>,
     )
@@ -176,9 +217,11 @@ describe('AppLayout', () => {
     render(
       <MemoryRouter>
         <AuthProvider>
-          <AppLayout>
-            <p>Contenido de la página</p>
-          </AppLayout>
+          <Routes>
+            <Route element={<MainLayout />}>
+              <Route index element={<p>Contenido de la página</p>} />
+            </Route>
+          </Routes>
         </AuthProvider>
       </MemoryRouter>,
     )

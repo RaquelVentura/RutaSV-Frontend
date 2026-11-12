@@ -3,6 +3,7 @@
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import UserMenu from '../../components/UserMenu.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
+import { getUserMenuItems, getUserMenuLabel } from '../../lib/userMenu.js'
 import { getOperatorDisplayName } from './operatorRepository.js'
 
 const navigation = [
@@ -44,12 +45,8 @@ function OperatorLayout() {
             RutaSV
           </Link>
           <UserMenu
-            label={`OT · ${operatorName}`}
-            items={[
-              { to: '/operador/configuracion', label: 'Configuración del negocio' },
-              { to: '/perfil', label: 'Mi perfil' },
-              { to: '/', label: 'Ver sitio' },
-            ]}
+            label={getUserMenuLabel(user)}
+            items={getUserMenuItems(user)}
             onLogout={logout}
             className="max-w-[65%] md:max-w-sm"
           />

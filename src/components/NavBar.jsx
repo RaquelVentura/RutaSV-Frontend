@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Roles } from '../lib/roles.js'
-import Button from './Button.jsx'
+import { getUserMenuItems, getUserMenuLabel } from '../lib/userMenu.js'
 import LinkButton from './LinkButton.jsx'
+import UserMenu from './UserMenu.jsx'
 
 const linkClass = 'text-sm font-medium text-ink hover:text-brand'
 
-function NavBar({ user = null, onLogout }) {
+function NavBar({ user = null, onLogout, onMenuOpen }) {
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
 
@@ -38,45 +38,23 @@ function NavBar({ user = null, onLogout }) {
           <Link to="/experiencias" className={linkClass}>
             Explorar
           </Link>
-          {user?.role === Roles.VISITANTE && (
-            <>
-              <Link to="/mis-reservas" className={linkClass}>
-                Mis reservas
-              </Link>
-              <Link to="/favoritos" className={linkClass}>
-                Favoritos
-              </Link>
-            </>
-          )}
-          {(user?.role === Roles.OPERADOR || user?.role === Roles.ADMIN) && (
-            <Link to="/operador" className={linkClass}>
-              Panel de operador
-            </Link>
-          )}
-          {user?.role === Roles.ADMIN && (
-            <Link to="/admin" className={linkClass}>
-              Administración
-            </Link>
-          )}
         </div>
 
         <div className="flex items-center gap-3">
           <span className="hidden text-xs font-semibold text-brand lg:inline">ES / EN ▾</span>
           {user ? (
-            <>
-              <Link to="/perfil" className={linkClass}>
-                Hola, {user.name || user.firstName}
-              </Link>
-              <Button variant="outline" onClick={onLogout}>
-                Cerrar sesión
-              </Button>
-            </>
+            <UserMenu
+              label={getUserMenuLabel(user)}
+              items={getUserMenuItems(user)}
+              onOpen={onMenuOpen}
+              onLogout={onLogout}
+            />
           ) : (
             <>
-              <LinkButton to="/auth/login" variant="outline">
-                Login
+              <LinkButton to="/login" variant="outline">
+                Iniciar sesión
               </LinkButton>
-              <LinkButton to="/auth/register">Registro</LinkButton>
+              <LinkButton to="/registro">Registro</LinkButton>
             </>
           )}
         </div>

@@ -1,7 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import AdminLayout from './layouts/AdminLayout.jsx'
-import AppLayout from './layouts/AppLayout.jsx'
+import MainLayout from './layouts/MainLayout.jsx'
 import { Roles } from './lib/roles.js'
 import AdminDashboard from './pages/Admin/AdminDashboard.jsx'
 import CreateUser from './pages/Admin/CreateUser.jsx'
@@ -62,8 +62,8 @@ function AppRoutes() {
         </Route>
       </Route>
 
-      {/* Rutas públicas y de visitante autenticado bajo AppLayout */}
-      <Route element={<AppLayout />}>
+      {/* Rutas públicas y de visitante autenticado bajo MainLayout */}
+      <Route element={<MainLayout />}>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/auth/login" element={<Navigate to="/login" replace />} />
