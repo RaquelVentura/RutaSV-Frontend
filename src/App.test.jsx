@@ -45,6 +45,18 @@ function renderAt(path) {
   )
 }
 
+// Las vistas del operador guardan sus datos localmente (operatorRepository.js)
+// con una clave que depende del perfil activo; la buscamos por colección.
+function readSaved(collection) {
+  const keys = Array.from({ length: localStorage.length }, (_, index) =>
+    localStorage.key(index),
+  )
+  const key = keys.find(
+    (item) => item.startsWith('rutasv:operator:') && item.endsWith(`:${collection}`),
+  )
+  return key ? JSON.parse(localStorage.getItem(key)) : null
+}
+
 describe('App', () => {
   it('muestra la portada en /', () => {
     renderAt('/')
@@ -90,6 +102,27 @@ describe('App', () => {
     ).toBe(true)
   })
 
+  it('personaliza el resumen con el perfil activo', () => {
+    localStorage.setItem(
+      'token',
+      createMockJwt({
+        sub: 'operator-a',
+        email: 'operator-a@rutasv.com',
+        business_name: 'Volcan Tours',
+        'http://schemas.microsoft.com/ws/2008/06/identity/claims/role': 'OPERADOR',
+        email_verified: 'true',
+        exp: 4102444800,
+      }),
+    )
+
+    renderAt('/operador')
+
+    expect(
+      screen.getByText('Hola, Volcan Tours. Aquí tienes la actividad de tu negocio.'),
+    ).toBeInTheDocument()
+    expect(readSaved('experiences')).toBeNull()
+  })
+
   it('permite buscar y filtrar las experiencias de muestra', () => {
     setRoleSession('OPERADOR')
     renderAt('/operador/experiencias')
@@ -105,7 +138,7 @@ describe('App', () => {
     expect(screen.queryByText('Ruta de café en Apaneca')).not.toBeInTheDocument()
   })
 
-  it('valida la publicación de experiencias e informa que aún no se guarda en backend', () => {
+  it('guarda una experiencia localmente como preparación para el backend', () => {
     setRoleSession('OPERADOR')
     renderAt('/operador/experiencias/nueva')
 
@@ -132,9 +165,32 @@ describe('App', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: 'Guardar experiencia' }))
 
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'la experiencia no se guardó porque esta vista aún no está conectada al backend',
+    expect(screen.getByRole('status')).toHaveTextContent('guardados en este navegador')
+    expect(readSaved('experiences')).toContainEqual(
+      expect.objectContaining({
+        title: 'Amanecer en el volcán',
+        category: 'Naturaleza',
+        location: 'Santa Ana',
+        price: 35,
+        capacity: 8,
+      }),
     )
+  })
+
+  it('carga y guarda los cambios al editar una experiencia', () => {
+    setRoleSession('OPERADOR')
+    renderAt('/operador/experiencias/nueva?editar=1')
+
+    expect(screen.getByRole('heading', { name: 'Editar experiencia' })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Nombre de la experiencia'), {
+      target: { value: 'Surf al atardecer' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    expect(readSaved('experiences').find((item) => item.id === 1).title).toBe(
+      'Surf al atardecer',
+    )
+    expect(screen.getByRole('status')).toHaveTextContent('Cambios guardados')
   })
 
   it('muestra cupos y filtra reservas por estado', () => {
@@ -151,11 +207,38 @@ describe('App', () => {
     expect(screen.queryByText('María López')).not.toBeInTheDocument()
   })
 
+  it('permite añadir una fecha, hora y cupos disponibles', () => {
+    setRoleSession('OPERADOR')
+    renderAt('/operador/cupos')
+    fireEvent.click(screen.getByRole('button', { name: '+ Agregar fecha' }))
+    fireEvent.change(screen.getByLabelText('Día'), { target: { value: '2026-12-10' } })
+    fireEvent.change(screen.getByLabelText('Hora'), { target: { value: '10:30' } })
+    fireEvent.change(screen.getByLabelText('Capacidad total'), { target: { value: '12' } })
+    fireEvent.change(screen.getByLabelText('Cupos disponibles'), { target: { value: '10' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cupos' }))
+
+    expect(readSaved('availability')).toContainEqual(
+      expect.objectContaining({
+        date: '2026-12-10',
+        time: '10:30',
+        available: 10,
+        capacity: 12,
+      }),
+    )
+  })
+
   it('incluye las secciones de reseñas y configuración del operador', () => {
     setRoleSession('OPERADOR')
     const { unmount } = renderAt('/operador/resenas')
     expect(screen.getByRole('heading', { name: 'Reseñas' })).toBeInTheDocument()
     expect(screen.getByText(/una experiencia increíble/i)).toBeInTheDocument()
+    fireEvent.click(screen.getAllByRole('button', { name: 'Responder' })[0])
+    expect(screen.getAllByLabelText('Respuesta pública')[0]).toBeVisible()
+    fireEvent.change(screen.getAllByLabelText('Respuesta pública')[0], {
+      target: { value: '¡Gracias por visitarnos!' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar respuesta' }))
+    expect(readSaved('reviews')[0].reply).toBe('¡Gracias por visitarnos!')
 
     unmount()
     renderAt('/operador/configuracion')
