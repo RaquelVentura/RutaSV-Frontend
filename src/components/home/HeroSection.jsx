@@ -1,19 +1,8 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import heroImage from '../../assets/home/hero.jpg'
-import { searchCategories } from '../../data/home.js'
 import Container from '../Container.jsx'
 import Icon from '../Icon.jsx'
 
 function HeroSection() {
-  const navigate = useNavigate()
-  const [search, setSearch] = useState({
-    zone: '',
-    category: searchCategories[0],
-    date: '',
-    people: '2',
-  })
-
   return (
     <Container className="">
       <section className="relative overflow-hidden bg-ink text-white py-6">
