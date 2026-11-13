@@ -13,6 +13,7 @@ import {
   OperatorRequestStatus,
   StatusMeta,
 } from '../../lib/operatorRequests.js'
+import useAdminSearch from '../../lib/useAdminSearch.js'
 
 const allStatuses = 'todos'
 const defaultPageSize = 10
@@ -49,7 +50,7 @@ function EmptyQueue({ filtered }) {
 }
 
 function RequestsQueue() {
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useAdminSearch()
   const [status, setStatus] = useState(OperatorRequestStatus.PENDIENTE)
   const [sort, setSort] = useState('recientes')
   const [pageNumber, setPageNumber] = useState(1)

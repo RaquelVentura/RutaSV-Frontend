@@ -1,38 +1,72 @@
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import AdminCard from '../../components/admin/AdminCard.jsx'
+import Notice from '../../components/admin/Notice.jsx'
 import Pill from '../../components/admin/Pill.jsx'
 import Button from '../../components/Button.jsx'
 import FormField from '../../components/FormField.jsx'
 import LinkButton from '../../components/LinkButton.jsx'
 import SelectField from '../../components/SelectField.jsx'
+import api from '../../config/axios'
 import { roleDescriptions } from '../../data/admin.js'
+import { extractBackendErrorMessage } from '../../lib/operatorRequests.js'
 
 const roleTones = { VISITANTE: 'neutral', OPERADOR: 'success', ADMIN: 'info' }
-const roleOptions = ['Visitante', 'Operador', 'Admin']
 
-function CheckField({ id, label, defaultChecked }) {
-  return (
-    <label htmlFor={id} className="flex items-center gap-2 text-sm text-ink">
-      <input
-        id={id}
-        type="checkbox"
-        defaultChecked={defaultChecked}
-        className="size-4 accent-brand"
-      />
-      {label}
-    </label>
-  )
+// El backend crea siempre cuentas con rol Visitante (POST /api/auth/register).
+// Operador y Admin requieren un endpoint de administración que aún no existe.
+const roleOptions = ['Visitante']
+
+const passwordRules = 'Mínimo 8 caracteres, con mayúscula, minúscula y número.'
+
+function getPasswordError(password) {
+  if (password.length < 8) return 'La contraseña debe tener al menos 8 caracteres.'
+  if (!/[A-Z]/.test(password)) return 'La contraseña debe contener al menos una letra mayúscula.'
+  if (!/[a-z]/.test(password)) return 'La contraseña debe contener al menos una letra minúscula.'
+  if (!/[0-9]/.test(password)) return 'La contraseña debe contener al menos un número.'
+  return ''
 }
 
 function CreateUser() {
   const navigate = useNavigate()
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState('')
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault()
     const form = event.currentTarget
-    const name = `${form.elements.firstName.value} ${form.elements.lastName.value}`.trim()
-    
-    navigate('/admin/usuarios', { state: { notice: `Usuario creado: ${name}.` } })
+    const firstName = form.elements.firstName.value.trim()
+    const lastName = form.elements.lastName.value.trim()
+    const email = form.elements.email.value.trim()
+    const password = form.elements.password.value
+
+    const passwordError = getPasswordError(password)
+    if (passwordError) {
+      setError(passwordError)
+      return
+    }
+
+    setError('')
+    setIsLoading(true)
+
+    try {
+      // Se usa el mismo endpoint que el registro público. La respuesta trae el token de
+      // la cuenta nueva: no se guarda, para no reemplazar la sesión del administrador.
+      await api.post('/auth/register', { email, password, firstName, lastName })
+
+      const name = `${firstName} ${lastName}`.trim()
+      navigate('/admin/usuarios', {
+        state: {
+          notice: `Usuario creado: ${name}. Se envió un correo de verificación a ${email}.`,
+        },
+      })
+    } catch (err) {
+      setError(
+        extractBackendErrorMessage(err, 'No se pudo crear el usuario. Inténtalo de nuevo.'),
+      )
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -52,8 +86,8 @@ function CreateUser() {
         <AdminCard>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
-              <FormField id="user-first-name" name="firstName" label="Nombre" placeholder="Josue" required />
-              <FormField id="user-last-name" name="lastName" label="Apellido" placeholder="Antonio" required />
+              <FormField id="user-first-name" name="firstName" label="Nombre" placeholder="Josue" maxLength={80} required />
+              <FormField id="user-last-name" name="lastName" label="Apellido" placeholder="Antonio" maxLength={80} required />
             </div>
             <FormField
               id="user-email"
@@ -61,27 +95,39 @@ function CreateUser() {
               type="email"
               label="Correo electrónico"
               placeholder="nombre@correo.com"
+              maxLength={150}
               required
             />
-            <SelectField id="user-role" name="role" label="Rol" options={roleOptions} />
+            <div>
+              <SelectField id="user-role" name="role" label="Rol" options={roleOptions} disabled />
+              <p className="mt-1.5 text-xs text-muted">
+                Las cuentas creadas desde aquí son de Visitante.
+              </p>
+            </div>
             <FormField
               id="user-password"
               name="password"
               type="text"
               label="Contraseña temporal"
-              placeholder="Genera o escribe una contraseña segura"
+              placeholder="Escribe una contraseña segura"
+              hint={passwordRules}
               autoComplete="off"
+              maxLength={100}
               required
             />
-            <div className="space-y-2">
-              <CheckField id="user-force-change" label="Pedir que cambie la contraseña en su primer inicio de sesión" defaultChecked />
-              <CheckField id="user-send-verification" label="Enviar correo de verificación" defaultChecked />
-            </div>
+            <p className="text-xs text-muted">
+              Se enviará un correo de verificación a la dirección indicada.
+            </p>
+
+            {error && <Notice tone="error">{error}</Notice>}
+
             <div className="grid grid-cols-1 gap-3 pt-2 sm:grid-cols-[1fr_2fr]">
               <LinkButton to="/admin/usuarios" variant="outline">
                 Cancelar
               </LinkButton>
-              <Button type="submit">Crear usuario</Button>
+              <Button type="submit" disabled={isLoading}>
+                {isLoading ? 'Creando...' : 'Crear usuario'}
+              </Button>
             </div>
           </form>
         </AdminCard>
@@ -96,8 +142,8 @@ function CreateUser() {
             ))}
           </ul>
           <p className="mt-4 text-xs text-pending">
-            Los operadores normalmente llegan por solicitud. Usa «Operador» solo para casos
-            excepcionales.
+            Los operadores llegan por solicitud. El rol Admin se asigna directamente en la base
+            de datos hasta que el backend lo permita.
           </p>
         </AdminCard>
       </div>

@@ -154,6 +154,86 @@ describe('Vistas de administrador', () => {
     expect(await screen.findByText('Josue Antonio')).toBeInTheDocument()
   })
 
+  it('mantiene visible la navegación de secciones en todas las páginas del panel', () => {
+    renderAt('/admin/usuarios')
+
+    const sections = within(screen.getByRole('navigation', { name: /secciones del panel/i }))
+    expect(sections.getByRole('link', { name: 'Usuarios' })).toHaveAttribute('aria-current', 'page')
+    expect(sections.getByRole('link', { name: 'Resumen' })).toHaveAttribute('href', '/admin')
+
+    fireEvent.click(sections.getByRole('link', { name: 'Resumen' }))
+    expect(screen.getByRole('heading', { name: /hola, administrador/i })).toBeInTheDocument()
+    expect(
+      within(screen.getByRole('navigation', { name: /secciones del panel/i })).getByRole('link', {
+        name: 'Resumen',
+      }),
+    ).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('mantiene el buscador y el mismo menú de usuario en el resumen y en las demás páginas', () => {
+    renderAt('/admin')
+
+    const searchName = '¿Qué vas a gestionar?'
+    expect(screen.getByRole('searchbox', { name: searchName })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /AR · Admin RutaSV/ }))
+    const menu = within(screen.getByRole('menu'))
+    expect(menu.getAllByRole('menuitem').map((item) => item.textContent)).toEqual([
+      'Mi perfil',
+      'Panel de administración',
+      'Ver sitio',
+      'Cerrar sesión',
+    ])
+
+    fireEvent.click(
+      within(screen.getByRole('navigation', { name: /secciones del panel/i })).getByRole('link', {
+        name: 'Usuarios',
+      }),
+    )
+    expect(screen.getByRole('searchbox', { name: searchName })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /AR · Admin RutaSV/ })).toBeInTheDocument()
+  })
+
+  it('el buscador del encabezado filtra la lista de usuarios', () => {
+    renderAt('/admin/usuarios')
+
+    fireEvent.change(screen.getByRole('searchbox', { name: '¿Qué vas a gestionar?' }), {
+      target: { value: 'marta' },
+    })
+
+    expect(screen.getByText('Marta Rivas')).toBeInTheDocument()
+    expect(screen.queryByText('Ana López')).not.toBeInTheDocument()
+    expect(screen.getByRole('searchbox', { name: 'Buscar usuarios' })).toHaveValue('marta')
+  })
+
+  it('el buscador del encabezado filtra la cola de solicitudes', async () => {
+    renderAt('/admin/solicitudes')
+    await screen.findByText('Ecoparque El Espino')
+
+    fireEvent.change(screen.getByRole('searchbox', { name: '¿Qué vas a gestionar?' }), {
+      target: { value: 'zzz' },
+    })
+
+    expect(
+      screen.getByRole('heading', { name: /ninguna solicitud coincide con tu búsqueda/i }),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('Ecoparque El Espino')).not.toBeInTheDocument()
+  })
+
+  it('al buscar desde el resumen lleva a las solicitudes con la búsqueda aplicada', async () => {
+    renderAt('/admin')
+
+    const header = screen.getByRole('searchbox', { name: '¿Qué vas a gestionar?' })
+    fireEvent.change(header, { target: { value: 'Ecoparque' } })
+    fireEvent.submit(header.closest('form'))
+
+    expect(
+      await screen.findByRole('heading', { name: /solicitudes de operador/i }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('searchbox', { name: 'Buscar solicitudes' })).toHaveValue('Ecoparque')
+    expect(await screen.findByText('Ecoparque El Espino')).toBeInTheDocument()
+  })
+
   it('navega del dashboard a la cola de solicitudes', async () => {
     renderAt('/admin')
     fireEvent.click(screen.getByRole('link', { name: /ver solicitudes/i }))
@@ -297,7 +377,8 @@ describe('Vistas de administrador', () => {
     expect(screen.getByText('Marta Rivas')).toBeInTheDocument()
   })
 
-  it('crea un usuario y vuelve a la lista con aviso', () => {
+  it('crea un usuario y vuelve a la lista con aviso', async () => {
+    api.post.mockResolvedValue({ data: { token: 'token-de-la-cuenta-nueva' } })
     renderAt('/admin/usuarios')
     fireEvent.click(screen.getByRole('link', { name: /crear usuario/i }))
 
@@ -312,7 +393,12 @@ describe('Vistas de administrador', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: /^crear usuario$/i }))
 
+    expect(await screen.findByText(/usuario creado: ana mena/i)).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /^usuarios$/i })).toBeInTheDocument()
-    expect(screen.getByText(/usuario creado: ana mena/i)).toBeInTheDocument()
+    expect(api.post).toHaveBeenCalledWith('/auth/register', expect.objectContaining({
+      email: 'ana.mena@correo.com',
+      firstName: 'Ana',
+      lastName: 'Mena',
+    }))
   })
 })

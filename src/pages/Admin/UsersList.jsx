@@ -9,6 +9,7 @@ import Pill from '../../components/admin/Pill.jsx'
 import SearchInput from '../../components/admin/SearchInput.jsx'
 import LinkButton from '../../components/LinkButton.jsx'
 import { users } from '../../data/admin.js'
+import useAdminSearch from '../../lib/useAdminSearch.js'
 
 const ALL = 'todos'
 
@@ -50,7 +51,7 @@ function getActions(user) {
 
 function UsersList() {
   const location = useLocation()
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useAdminSearch()
   const [role, setRole] = useState(ALL)
   const [status, setStatus] = useState(ALL)
 

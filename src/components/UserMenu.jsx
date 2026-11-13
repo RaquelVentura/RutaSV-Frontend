@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 const itemClass =
   'block w-full px-4 py-2.5 text-left text-sm text-ink hover:bg-canvas hover:text-brand'
 
-function UserMenu({ label, items = [], onLogout, className = '' }) {
+function UserMenu({ label, items = [], onOpen, onLogout, className = '' }) {
   const [isOpen, setIsOpen] = useState(false)
   const containerRef = useRef(null)
   const menuId = useId()
@@ -41,7 +41,10 @@ function UserMenu({ label, items = [], onLogout, className = '' }) {
         aria-haspopup="menu"
         aria-expanded={isOpen}
         aria-controls={isOpen ? menuId : undefined}
-        onClick={() => setIsOpen((open) => !open)}
+        onClick={() => {
+          if (!isOpen) onOpen?.()
+          setIsOpen(!isOpen)
+        }}
         className={`flex max-w-full items-center gap-1 rounded-full bg-info-soft px-4 py-2 text-xs font-bold text-brand focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 ${className}`.trim()}
       >
         <span className="truncate">{label}</span>

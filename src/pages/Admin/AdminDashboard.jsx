@@ -11,16 +11,6 @@ import {
   OperatorRequestStatus,
 } from '../../lib/operatorRequests.js'
 
-const tabs = [
-  { label: 'Resumen', to: '/admin' },
-  { label: 'Solicitudes', to: '/admin/solicitudes' },
-  { label: 'Usuarios', to: '/admin/usuarios' },
-  { label: 'Empresas' },
-  { label: 'Experiencias' },
-]
-
-const tabClass = 'rounded-full border border-mist bg-surface px-4 py-1.5 text-xs font-semibold text-ink'
-
 function AdminDashboard() {
   const [pendingRequests, setPendingRequests] = useState([])
   const [pendingCount, setPendingCount] = useState(adminStats[0]?.value ?? 0)
@@ -71,29 +61,6 @@ function AdminDashboard() {
           </LinkButton>
         }
       />
-
-      <nav aria-label="Secciones del panel" className="flex flex-wrap gap-2">
-        {tabs.map((tab) =>
-          tab.to ? (
-            <Link
-              key={tab.label}
-              to={tab.to}
-              aria-current={tab.to === '/admin' ? 'page' : undefined}
-              className={
-                tab.to === '/admin'
-                  ? 'rounded-full bg-brand px-4 py-1.5 text-xs font-semibold text-white'
-                  : tabClass
-              }
-            >
-              {tab.label}
-            </Link>
-          ) : (
-            <button key={tab.label} type="button" className={tabClass}>
-              {tab.label}
-            </button>
-          ),
-        )}
-      </nav>
 
       <section aria-label="Resumen" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => (
