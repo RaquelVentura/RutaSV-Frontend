@@ -377,7 +377,8 @@ describe('Vistas de administrador', () => {
     expect(screen.getByText('Marta Rivas')).toBeInTheDocument()
   })
 
-  it('crea un usuario y vuelve a la lista con aviso', () => {
+  it('crea un usuario y vuelve a la lista con aviso', async () => {
+    api.post.mockResolvedValue({ data: { token: 'token-de-la-cuenta-nueva' } })
     renderAt('/admin/usuarios')
     fireEvent.click(screen.getByRole('link', { name: /crear usuario/i }))
 
@@ -392,7 +393,12 @@ describe('Vistas de administrador', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: /^crear usuario$/i }))
 
+    expect(await screen.findByText(/usuario creado: ana mena/i)).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /^usuarios$/i })).toBeInTheDocument()
-    expect(screen.getByText(/usuario creado: ana mena/i)).toBeInTheDocument()
+    expect(api.post).toHaveBeenCalledWith('/auth/register', expect.objectContaining({
+      email: 'ana.mena@correo.com',
+      firstName: 'Ana',
+      lastName: 'Mena',
+    }))
   })
 })
