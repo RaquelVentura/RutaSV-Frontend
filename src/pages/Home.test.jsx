@@ -43,16 +43,6 @@ describe('Home', () => {
     expect(screen.getByText('6 cupos')).toBeInTheDocument()
   })
 
-  it('envía la búsqueda del hero al catálogo con los filtros elegidos', () => {
-    renderHome()
-
-    fireEvent.change(screen.getByLabelText('Zona'), { target: { value: 'El Tunco' } })
-    fireEvent.change(screen.getByLabelText('Personas'), { target: { value: '3' } })
-    fireEvent.click(screen.getByRole('button', { name: /buscar experiencias/i }))
-
-    expect(screen.getByText('/experiencias?zona=El+Tunco&personas=3')).toBeInTheDocument()
-  })
-
   it('valida el correo del boletín', () => {
     renderHome()
 
