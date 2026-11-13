@@ -2,11 +2,8 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import heroImage from '../../assets/home/hero.jpg'
 import { searchCategories } from '../../data/home.js'
-import Button from '../Button.jsx'
 import Container from '../Container.jsx'
-import FormField from '../FormField.jsx'
 import Icon from '../Icon.jsx'
-import SelectField from '../SelectField.jsx'
 
 function HeroSection() {
   const navigate = useNavigate()
@@ -16,22 +13,6 @@ function HeroSection() {
     date: '',
     people: '2',
   })
-
-  function handleChange(event) {
-    const { name, value } = event.target
-    setSearch((current) => ({ ...current, [name]: value }))
-  }
-
-  function handleSubmit(event) {
-    event.preventDefault()
-    const params = new URLSearchParams()
-    if (search.zone.trim()) params.set('zona', search.zone.trim())
-    if (search.category !== searchCategories[0]) params.set('categoria', search.category)
-    if (search.date) params.set('fecha', search.date)
-    if (search.people) params.set('personas', search.people)
-    const query = params.toString()
-    navigate(query ? `/experiencias?${query}` : '/experiencias')
-  }
 
   return (
     <Container className="">
