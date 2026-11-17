@@ -68,39 +68,38 @@ npm install
 Crea la carpeta `node_modules`. La primera vez puede tardar un par de minutos.
 
 ### 3.4 Crea tu `.env`
+
 Copia la plantilla incluida en el repo:
 
 ```bash
 cp .env.example .env              # Git Bash, Linux o macOS
 ```
+
 ```powershell
 Copy-Item .env.example .env       # Windows PowerShell
-
-```bash
-npm install
 ```
 
-Crea la carpeta `node_modules`. La primera vez puede tardar un par de minutos.
-
-### 3.4 Crea tu `.env`
-
-Copia la plantilla incluida en el repo:
-
-```bash
-cp .env.example .env              # Git Bash, Linux o macOS
-```
-
-```powershell
-Copy-Item .env.example .env       # Windows PowerShell
-```
-
-| Variable | Valor por defecto | Función |
+| Variable | Valor en `.env.example` | Función |
 | :--- | :--- | :--- |
-| `VITE_API_PROXY_TARGET` | `http://localhost:8080` | A dónde reenvía Vite las peticiones `/api` con `npm run dev` |
+| `VITE_API_PROXY_TARGET` | `http://localhost:5000/api` | A dónde reenvía Vite las peticiones `/api` con `npm run dev` |
+| `VITE_GOOGLE_CLIENT_ID` | `tu_google_client_id.apps.googleusercontent.com` | **Client ID de Google OAuth 2.0** (compartido por WhatsApp) para el botón de login/registro con Google |
 | `API_UPSTREAM` | `http://host.docker.internal:8080` | A dónde las reenvía Nginx con `docker compose up` |
 | `FRONTEND_PORT` | `5173` | Puerto con el que se publica el contenedor |
 
 Este archivo está en `.gitignore`, así que tus valores no se suben a GitHub.
+
+#### Configuración obligatoria de Google OAuth 2.0 (`VITE_GOOGLE_CLIENT_ID`)
+
+En el archivo `.env` verás la línea:
+
+```dotenv
+VITE_GOOGLE_CLIENT_ID=tu_google_client_id.apps.googleusercontent.com
+```
+
+Para que los botones de **Iniciar sesión con Google** y **Registrarse con Google** funcionen:
+1. Toma las credenciales de **Google OAuth 2.0 compartidas por WhatsApp** con el equipo.
+2. Reemplaza `tu_google_client_id.apps.googleusercontent.com` por el valor real del **`CLIENT_ID`** (debe coincidir con el `GOOGLE_CLIENT_ID` configurado en el `.env` de `RutaSV-Backend`).
+3. Si ya tenías `npm run dev` corriendo cuando editaste el `.env`, **detén el servidor (`Ctrl + C`) y vuelve a ejecutar `npm run dev`** para que Vite recargue la variable.
 
 ### 3.5 Arranca la app
 ```bash
