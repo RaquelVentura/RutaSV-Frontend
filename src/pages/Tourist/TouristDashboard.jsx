@@ -1,6 +1,6 @@
 
 import { NavLink, Outlet } from 'react-router-dom'
-import Container from '../../../components/Container.jsx'
+import Container from '../../components/Container.jsx'
 
 function TouristDashboard() {
   const modules = [

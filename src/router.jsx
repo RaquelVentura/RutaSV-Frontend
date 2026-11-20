@@ -26,11 +26,11 @@ import OperatorReservations from './pages/Operators/OperatorReservations.jsx'
 import OperatorReviews from './pages/Operators/OperatorReviews.jsx'
 import OperatorSettings from './pages/Operators/OperatorSettings.jsx'
 import Profile from './pages/Profile/Profile.jsx'
-import Activity from './pages/Profile/Tourist/Activity.jsx'
-import Reservation from './pages/Profile/Tourist/Reservation.jsx'
-import Explorer from './pages/Profile/Tourist/Explorer.jsx'
+import Activity from './pages/Tourist/Activity.jsx'
+import Reservation from './pages/Tourist/Reservation.jsx'
+import Explorer from './pages/Tourist/Explorer.jsx'
 
-import TouristDashboard from './pages/Profile/Tourist/TouristDashboard.jsx'
+import TouristDashboard from './pages/Tourist/TouristDashboard.jsx'
 
 
 
