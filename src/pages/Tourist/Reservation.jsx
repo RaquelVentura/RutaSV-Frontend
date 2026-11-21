@@ -1,9 +1,8 @@
 
-
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-
-
+import Container from '../../components/turista/Container.jsx';
+import { defaultBooking, formatUsd, paymentMethods } from '../../data/turista.js';
 
 const inputClass =
   'w-full rounded-xl border bg-white px-3.5 py-3.5 text-[14px] text-[#102F3B] outline-none placeholder:text-[#637780] focus:border-[#087E9A]';

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
-import Container from '/Container';
+import Container from './Container';
 
 const links = [
   { to: '/turista/explorar', label: 'Explorar' },

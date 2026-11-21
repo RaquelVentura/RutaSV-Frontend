@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import Container from '/Container';
+import Container from './Container';
 
 const tabClass = ({ isActive }) =>
   `rounded-full px-[22px] py-[9px] text-[14px] ${

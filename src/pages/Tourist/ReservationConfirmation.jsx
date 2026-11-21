@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import Container from '';
+import Container from '../../components/turista/Container.jsx';
 import { assets, defaultBooking, formatUsd } from '../../data/turista';
 
 export default function ReservaConfirmacion() {

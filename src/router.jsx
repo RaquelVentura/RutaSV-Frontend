@@ -31,6 +31,10 @@ import Reservation from './pages/Tourist/Reservation.jsx'
 import Explorer from './pages/Tourist/Explorer.jsx'
 
 import TouristDashboard from './pages/Tourist/TouristDashboard.jsx'
+import TuristaLayout from './layouts/TuristaLayout.jsx'
+import ReservationConfirmation from './pages/Tourist/ReservationConfirmation.jsx'
+import ActivityReservations from './pages/Tourist/ActivityReservations.jsx'
+import ActivityFavorites from './pages/Tourist/ActivityFavorites.jsx'
 
 
 
@@ -83,14 +87,14 @@ function AppRoutes() {
  {/*Rutas de Turista, en esta seccion falta colocar la restriccion acerca del rol */}
 
 
-<Route path="/turista" element={<TouristDashboard />}>
-  <Route index element={<Explorer />} />
-
+<Route path="/turista" element={<TuristaLayout />}>
+  <Route index element={<Navigate to="explorar" replace />} />
   <Route path="explorar" element={<Explorer />} />
-
-  <Route path="reservas" element={<Reservation />} />
-
-  <Route path="actividad" element={<Activity />} />
+  <Route path="reservar" element={<Reservation />} />
+  <Route path="reservar/confirmacion" element={<ReservationConfirmation />} />
+  <Route path="mi-actividad" element={<Navigate to="reservas" replace />} />
+  <Route path="mi-actividad/reservas" element={<ActivityReservations />} />
+  <Route path="mi-actividad/favoritos" element={<ActivityFavorites />} />
 </Route>
  
 
