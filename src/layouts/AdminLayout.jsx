@@ -8,14 +8,13 @@ import useAdminSearch from '../lib/useAdminSearch.js'
 import { getUserMenuItems, getUserMenuLabel } from '../lib/userMenu.js'
 
 // Listas donde el buscador del encabezado filtra en vivo.
-const searchableRoutes = ['/admin/solicitudes', '/admin/usuarios']
+const searchableRoutes = ['/admin/solicitudes', '/admin/usuarios', '/admin/operadores']
 
 const sections = [
   { label: 'Resumen', to: '/admin', end: true },
   { label: 'Solicitudes', to: '/admin/solicitudes' },
   { label: 'Usuarios', to: '/admin/usuarios' },
-  { label: 'Empresas' },
-  { label: 'Experiencias' },
+  { label: 'Operadores', to: '/admin/operadores' },
 ]
 
 const pillClass = ({ isActive }) =>

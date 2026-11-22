@@ -35,6 +35,7 @@ import TuristaLayout from './layouts/TuristaLayout.jsx'
 import ReservationConfirmation from './pages/Tourist/ReservationConfirmation.jsx'
 import ActivityReservations from './pages/Tourist/ActivityReservations.jsx'
 import ActivityFavorites from './pages/Tourist/ActivityFavorites.jsx'
+import OperatorsList from './pages/Admin/OperatorsList.jsx'
 
 
 
@@ -74,6 +75,7 @@ function AppRoutes() {
           <Route path="usuarios" element={<UsersList />} />
           <Route path="usuarios/nuevo" element={<CreateUser />} />
           <Route path="solicitudes" element={<RequestsQueue />} />
+          <Route path="operadores" element={<OperatorsList />} />
           <Route
             path="solicitudes-operador"
             element={<Navigate to="/admin/solicitudes" replace />}
