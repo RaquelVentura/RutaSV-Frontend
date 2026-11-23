@@ -2,7 +2,18 @@
 
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { BarChart, ChartCard, DonutChart, LineChart } from '../../components/operator/Charts.jsx'
+import CuposCalendar from '../../components/operator/CuposCalendar.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
+import {
+  cancellationShare,
+  dayRangeLabel,
+  lastDays,
+  monthlyCumulative,
+  occupancy as computeOccupancy,
+  reservationsByDay,
+  revenueByDay,
+} from '../../lib/operatorMetrics.js'
 import { formatCurrency } from './operatorData.js'
 import {
   getOperatorDisplayName,
@@ -14,15 +25,34 @@ function OperatorDashboard() {
   const { user } = useAuth()
   const operatorName = getOperatorDisplayName(user)
   const [showStatistics, setShowStatistics] = useState(true)
+  const [calendarDate, setCalendarDate] = useState('')
   const { experiences, reservations, reviews, availability } = useMemo(
     () => ({
       experiences: readOperatorCollection(user, 'experiences'),
-      reservations: readOperatorCollection(user, 'reservations'),
-      reviews: readOperatorCollection(user, 'reviews'),
+      // Las métricas, los listados de reservas y las reseñas se alimentarán de la API de
+      // reportes en el Sprint 3. Mientras tanto el resumen se muestra en cero, sin datos de ejemplo.
+      reservations: [],
+      reviews: [],
       availability: readOperatorCollection(user, 'availability'),
     }),
     [user],
   )
+
+  const metricsAvailability = []
+
+  const firstDate = availability.map((item) => item.date).sort()[0]
+  const monthBase = firstDate ? new Date(`${firstDate}T00:00:00`) : new Date()
+  const calendarMonth = { year: monthBase.getFullYear(), month: monthBase.getMonth() }
+
+  const week = lastDays(7)
+  const dailyReservations = reservationsByDay(reservations, week)
+  const dailyRevenue = revenueByDay(reservations, experiences, week)
+  const weekReservations = dailyReservations.reduce((sum, item) => sum + item.value, 0)
+  const weekRevenue = dailyRevenue.reduce((sum, item) => sum + item.value, 0)
+  const occupancyData = computeOccupancy(metricsAvailability)
+  const cancellations = cancellationShare(reservations)
+  const evolution = monthlyCumulative(reservations, 6)
+  const monthName = new Intl.DateTimeFormat('es-SV', { month: 'long', year: 'numeric' }).format(new Date())
 
   const confirmedReservations = reservations.filter(
     (reservation) => reservation.status === 'Confirmada',
@@ -33,17 +63,20 @@ function OperatorDashboard() {
   const canceledReservations = reservations.filter(
     (reservation) => reservation.status === 'Cancelada',
   )
-  const revenue = confirmedReservations.reduce((total, reservation) => {
+  const paidReservations = reservations.filter(
+    (reservation) => reservation.status === 'Confirmada' || reservation.status === 'Completada',
+  )
+  const revenue = paidReservations.reduce((total, reservation) => {
     const experience = experiences.find(
       (item) => String(item.id) === String(reservation.experienceId),
     )
     return total + (experience?.price ?? 0) * reservation.guests
   }, 0)
-  const totalCapacity = availability.reduce(
+  const totalCapacity = metricsAvailability.reduce(
     (total, item) => total + Number(item.capacity || 0),
     0,
   )
-  const assignedCapacity = availability.reduce(
+  const assignedCapacity = metricsAvailability.reduce(
     (total, item) =>
       total + Math.max(0, Number(item.capacity || 0) - Number(item.available || 0)),
     0,
@@ -66,7 +99,7 @@ function OperatorDashboard() {
     {
       label: 'Ingresos confirmados',
       value: formatCurrency(revenue),
-      detail: `${confirmedReservations.reduce((total, item) => total + item.guests, 0)} viajeros confirmados`,
+      detail: `${paidReservations.reduce((total, item) => total + item.guests, 0)} viajeros confirmados o atendidos`,
     },
     {
       label: 'Ocupación',
@@ -118,6 +151,73 @@ function OperatorDashboard() {
             <p className="text-xs leading-5 text-muted">{stat.detail}</p>
           </article>
         ))}
+      </section>
+
+      <section aria-labelledby="operator-calendar-title" className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 id="operator-calendar-title" className="text-lg font-bold text-ink">Disponibilidad</h2>
+          <Link to="/operador/cupos" className="text-sm font-semibold text-brand hover:text-brand-dark">
+            Editar cupos →
+          </Link>
+        </div>
+        <CuposCalendar
+          rows={availability}
+          selectedDate={calendarDate}
+          onSelect={setCalendarDate}
+          initialMonth={calendarMonth}
+        />
+      </section>
+
+      <section aria-labelledby="operator-charts-title" className="space-y-4">
+        <h2 id="operator-charts-title" className="text-lg font-bold capitalize text-ink">
+          Gráficos · {monthName}
+        </h2>
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+          <ChartCard
+            title="Reservas por día"
+            subtitle={`${weekReservations} ${weekReservations === 1 ? 'reserva' : 'reservas'} en los últimos 7 días`}
+            badge={dayRangeLabel(week)}
+          >
+            <BarChart data={dailyReservations} label="Reservas por día" />
+          </ChartCard>
+          <ChartCard title="Ingresos por día" subtitle={`Total semanal: ${formatCurrency(weekRevenue)}`} badge="USD">
+            <BarChart data={dailyRevenue} label="Ingresos por día" format={(value) => `$${value}`} />
+          </ChartCard>
+          <ChartCard
+            title="Ocupación"
+            subtitle={`${occupancyData.assigned} cupos asignados de ${occupancyData.total}`}
+            badge={`${occupancyData.percent}%`}
+          >
+            <DonutChart
+              percent={occupancyData.percent}
+              caption="ocupación"
+              items={[
+                { label: 'Asignados', value: occupancyData.assigned, color: '#087e9a' },
+                { label: 'Disponibles', value: occupancyData.free, color: '#dfe8eb' },
+              ]}
+            />
+          </ChartCard>
+          <div className="md:col-span-2 xl:col-span-2">
+            <ChartCard title="Evolución de reservas" subtitle="Reservas acumuladas · últimos 6 meses" badge="Histórico">
+              <LineChart data={evolution} label="Evolución de reservas acumuladas" />
+            </ChartCard>
+          </div>
+          <ChartCard
+            title="Reservas canceladas"
+            subtitle={`${cancellations.canceled} de ${cancellations.total} reservas se cancelaron`}
+            badge={`${cancellations.percent}%`}
+          >
+            <DonutChart
+              percent={cancellations.percent}
+              caption="canceladas"
+              accent="#9a641f"
+              items={[
+                { label: 'Canceladas', value: cancellations.canceled, color: '#9a641f' },
+                { label: 'Realizadas o vigentes', value: cancellations.kept, color: '#dfe8eb' },
+              ]}
+            />
+          </ChartCard>
+        </div>
       </section>
 
       <div className="grid gap-5 xl:grid-cols-2">

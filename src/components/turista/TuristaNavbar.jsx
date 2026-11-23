@@ -1,26 +1,20 @@
 import { useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
+import { getUserMenuItems, getUserMenuLabel } from '../../lib/userMenu.js';
+import LinkButton from '../LinkButton.jsx';
+import UserMenu from '../UserMenu.jsx';
 import Container from './Container';
 
 const links = [
-  { to: '/turista/explorar', label: 'Explorar' },
-  { to: '/turista/reservar', label: 'Reservar' },
+  { to: '/experiencias', label: 'Explorar' },
   { to: '/turista/mi-actividad', label: 'Mi Actividad' },
 ];
 
 const navClass = ({ isActive }) =>
   `text-[14px] ${isActive ? 'font-bold text-[#087E9A]' : 'font-medium text-[#102F3B] hover:text-[#087E9A]'}`;
 
-export default function TuristaNavbar({ user }) {
+export default function TuristaNavbar({ user = null, onLogout, onMenuOpen }) {
   const [open, setOpen] = useState(false);
-  const name = user?.name ?? 'Ana López';
-  const initials = name
-    .split(' ')
-    .map((part) => part[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
-
   return (
     <header className="border-b border-[#DFE8EB] bg-white">
       <Container className="flex flex-wrap items-center justify-between gap-x-8 gap-y-4 py-5">
@@ -64,12 +58,21 @@ export default function TuristaNavbar({ user }) {
             <button type="button" className="text-[13px] font-semibold text-[#087E9A]">
               ES / EN ▾
             </button>
-            <button
-              type="button"
-              className="rounded-full bg-[#E9F5F7] px-4 py-2.5 text-[12px] font-semibold text-[#087E9A]"
-            >
-              {initials} · {name} ▾
-            </button>
+            {user ? (
+              <UserMenu
+                label={getUserMenuLabel(user)}
+                items={getUserMenuItems(user)}
+                onOpen={onMenuOpen}
+                onLogout={onLogout}
+              />
+            ) : (
+              <>
+                <LinkButton to="/login" variant="outline">
+                  Iniciar sesión
+                </LinkButton>
+                <LinkButton to="/registro">Registro</LinkButton>
+              </>
+            )}
           </div>
         </div>
       </Container>

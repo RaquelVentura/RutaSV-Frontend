@@ -1,10 +1,13 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import AdminLayout from './layouts/AdminLayout.jsx'
+import AuthLayout from './layouts/AuthLayout.jsx'
 import MainLayout from './layouts/MainLayout.jsx'
+import TuristaLayout from './layouts/TuristaLayout.jsx'
 import { Roles } from './lib/roles.js'
 import AdminDashboard from './pages/Admin/AdminDashboard.jsx'
 import CreateUser from './pages/Admin/CreateUser.jsx'
+import OperatorsList from './pages/Admin/OperatorsList.jsx'
 import RequestDetail from './pages/Admin/RequestDetail.jsx'
 import RequestsQueue from './pages/Admin/RequestsQueue.jsx'
 import UsersList from './pages/Admin/UsersList.jsx'
@@ -26,50 +29,37 @@ import OperatorReservations from './pages/Operators/OperatorReservations.jsx'
 import OperatorReviews from './pages/Operators/OperatorReviews.jsx'
 import OperatorSettings from './pages/Operators/OperatorSettings.jsx'
 import Profile from './pages/Profile/Profile.jsx'
-import Activity from './pages/Tourist/Activity.jsx'
-import Reservation from './pages/Tourist/Reservation.jsx'
-import Explorer from './pages/Tourist/Explorer.jsx'
-
-import TouristDashboard from './pages/Tourist/TouristDashboard.jsx'
-import TuristaLayout from './layouts/TuristaLayout.jsx'
-import ReservationConfirmation from './pages/Tourist/ReservationConfirmation.jsx'
-import ActivityReservations from './pages/Tourist/ActivityReservations.jsx'
 import ActivityFavorites from './pages/Tourist/ActivityFavorites.jsx'
-import OperatorsList from './pages/Admin/OperatorsList.jsx'
-
-
-
-
-
+import ActivityReservations from './pages/Tourist/ActivityReservations.jsx'
+import CompanyProfile from './pages/Companies/CompanyProfile.jsx'
+import ExperienceDetail from './pages/Experiences/ExperienceDetail.jsx'
+import ExperienceExplorer from './pages/Experiences/ExperienceExplorer.jsx'
+import Explorer from './pages/Tourist/Explorer.jsx'
+import Reservation from './pages/Tourist/Reservation.jsx'
+import ReservationConfirmation from './pages/Tourist/ReservationConfirmation.jsx'
 
 function AppRoutes() {
-
   return (
-
     <Routes>
-
       {/* Panel de operador: requiere rol OPERADOR o ADMIN */}
-      {/*<Route element={<ProtectedRoute roles={[Roles.OPERADOR, Roles.ADMIN]} />}> descomentar para activar */ }
+      <Route element={<ProtectedRoute roles={[Roles.OPERADOR, Roles.ADMIN]} />}>
         <Route path="/operador" element={<OperatorLayout />}>
-
-
-
-          <Route path="reservas" element={<OperatorReservations />} />
-          <Route path="resenas" element={<OperatorReviews />} />
-          <Route path="configuracion" element={<OperatorSettings />} />
+          <Route index element={<OperatorDashboard />} />
           <Route path="experiencias" element={<OperatorExperiences />} />
           <Route path="experiencias/nueva" element={<OperatorExperienceForm />} />
           <Route path="cupos" element={<OperatorAvailability />} />
+          <Route
+            path="calendario"
+            element={<Navigate to="/operador/cupos" replace />}
+          />
+          <Route path="reservas" element={<OperatorReservations />} />
+          <Route path="resenas" element={<OperatorReviews />} />
+          <Route path="configuracion" element={<OperatorSettings />} />
         </Route>
-     {/*</Route>*/} 
-
-
-
-
-
+      </Route>
 
       {/* Panel de administración: requiere rol ADMIN */}
-      {/*<Route element={<ProtectedRoute roles={[Roles.ADMIN]} />}> descomentar para activar */ }
+      <Route element={<ProtectedRoute roles={[Roles.ADMIN]} />}>
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminDashboard />} />
           <Route path="usuarios" element={<UsersList />} />
@@ -82,42 +72,31 @@ function AppRoutes() {
           />
           <Route path="solicitudes/:id" element={<RequestDetail />} />
         </Route>
-      {/*</Route>*/}
+      </Route>
 
+      {/* Vistas de turista: explorar es público; reservar y Mi actividad requieren sesión */}
+      <Route path="/turista" element={<TuristaLayout />}>
+        <Route index element={<Navigate to="explorar" replace />} />
+        <Route path="explorar" element={<Explorer />} />
+        <Route element={<ProtectedRoute />}>
+          <Route path="reservar" element={<Reservation />} />
+          <Route
+            path="reservar/confirmacion"
+            element={<ReservationConfirmation />}
+          />
+          <Route
+            path="mi-actividad"
+            element={<Navigate to="reservas" replace />}
+          />
+          <Route path="mi-actividad/reservas" element={<ActivityReservations />} />
+          <Route path="mi-actividad/favoritos" element={<ActivityFavorites />} />
+        </Route>
+      </Route>
 
-      
- {/*Rutas de Turista, en esta seccion falta colocar la restriccion acerca del rol */}
-
-
-<Route path="/turista" element={<TuristaLayout />}>
-  <Route index element={<Navigate to="explorar" replace />} />
-  <Route path="explorar" element={<Explorer />} />
-  <Route path="reservar" element={<Reservation />} />
-  <Route path="reservar/confirmacion" element={<ReservationConfirmation />} />
-  <Route path="mi-actividad" element={<Navigate to="reservas" replace />} />
-  <Route path="mi-actividad/reservas" element={<ActivityReservations />} />
-  <Route path="mi-actividad/favoritos" element={<ActivityFavorites />} />
-</Route>
- 
-
-      {/* Rutas públicas y de visitante autenticado bajo MainLayout */}
-      <Route element={<MainLayout />}>
-        <Route path="/" element={<Home />} />
+      {/* Acceso: carrusel con el logotipo y el formulario a la par */}
+      <Route element={<AuthLayout />}>
         <Route path="/login" element={<Login />} />
-        <Route path="/auth/login" element={<Navigate to="/login" replace />} />
         <Route path="/registro" element={<Registration />} />
-          
-
-
-
-
-
-
-        <Route
-
-          path="/auth/register"
-          element={<Navigate to="/registro" replace />}
-        />
         <Route path="/verify-email" element={<EmailVerification />} />
         <Route path="/registro/verificar" element={<EmailVerification />} />
         <Route
@@ -128,37 +107,43 @@ function AppRoutes() {
           path="/registro/verificacion/rechazada"
           element={<VerificationResult accepted={false} />}
         />
+      </Route>
+
+      {/* Rutas públicas y de visitante autenticado bajo MainLayout */}
+      <Route element={<MainLayout />}>
+        <Route path="/" element={<Home />} />
+        <Route path="/experiencias" element={<ExperienceExplorer />} />
+        <Route path="/experiencias/:slug" element={<ExperienceDetail />} />
+        <Route path="/empresas/:slug" element={<CompanyProfile />} />
+        <Route path="/auth/login" element={<Navigate to="/login" replace />} />
+        <Route
+          path="/auth/register"
+          element={<Navigate to="/registro" replace />}
+        />
 
         {/* Estado y detalle de solicitud de operador */}
-        {/*<Route element={<ProtectedRoute roles={[Roles.VISITANTE]} />}> descomentar para activar */ }
-
-
+        <Route
+          element={<ProtectedRoute roles={[Roles.VISITANTE, Roles.OPERADOR]} />}
+        >
           <Route path="/operador/solicitud" element={<MyOperatorRequest />} />
           <Route
             path="/solicitar-operador"
             element={<Navigate to="/operador/solicitud" replace />}
-
           />
-
-        {/*</Route>*/}
-
-        
+        </Route>
 
         {/* Creación o modificación de solicitud de operador: requiere visitante autenticado */}
-        {/*<Route element={<ProtectedRoute roles={[Roles.VISITANTE]} />}> descomentar para activar */ }
+        <Route element={<ProtectedRoute roles={[Roles.VISITANTE]} />}>
           <Route
             path="/operador/solicitud/formulario"
             element={<OperatorRequestForm />}
           />
-       {/*</Route>*/}
-
-
-
+        </Route>
 
         {/* Perfil de la cuenta: cualquier usuario autenticado */}
-        {/*<Route element={<ProtectedRoute />}> descomentar para activar */ }
+        <Route element={<ProtectedRoute />}>
           <Route path="/perfil" element={<Profile />} />
-        {/*</Route>*/}
+        </Route>
 
         <Route path="/sin-permiso" element={<Forbidden />} />
         <Route path="*" element={<NotFound />} />

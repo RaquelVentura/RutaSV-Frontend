@@ -1,4 +1,6 @@
 import { NavLink } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext.jsx';
+import { getDisplayName } from '../../lib/userMenu.js';
 import Container from './Container';
 
 const tabClass = ({ isActive }) =>
@@ -6,7 +8,10 @@ const tabClass = ({ isActive }) =>
     isActive ? 'bg-[#087E9A] font-semibold text-white' : 'font-medium text-[#102F3B] hover:bg-[#E9F5F7]'
   }`;
 
-export default function MiActividadShell({ userName = 'Ana', children }) {
+export default function MiActividadShell({ children }) {
+  const { user } = useAuth();
+  const userName = user?.firstName || getDisplayName(user).split(' ')[0];
+
   return (
     <Container className="flex flex-col gap-7 py-10 lg:px-24 xl:px-[144px]">
       <header className="flex flex-col gap-1.5">

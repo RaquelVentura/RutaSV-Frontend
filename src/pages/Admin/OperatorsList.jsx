@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import AdminPageHeader from '../../components/admin/AdminPageHeader.jsx'
 import Avatar from '../../components/admin/Avatar.jsx'
 import FilterSelect from '../../components/admin/FilterSelect.jsx'
@@ -7,7 +7,7 @@ import Notice from '../../components/admin/Notice.jsx'
 import Pagination from '../../components/admin/Pagination.jsx'
 import Pill from '../../components/admin/Pill.jsx'
 import SearchInput from '../../components/admin/SearchInput.jsx'
-import { operators } from '../../data/operators.js'
+import { operators as initialOperators } from '../../data/operators.js'
 import useAdminSearch from '../../lib/useAdminSearch.js'
 
 const ALL = 'todos'
@@ -26,17 +26,40 @@ const actionClass =
 const neutralAction = `${actionClass} border-brand text-brand hover:bg-info-soft`
 const dangerAction = `${actionClass} border-danger text-danger hover:bg-danger-soft`
 
+// Cada acción navega o cambia el estado del operador.
 function getActions(operator) {
-  if (operator.status === 'En revisión') return [{ label: 'Ver solicitud' }]
+  if (operator.status === 'En revisión') {
+    return [{ label: 'Ver solicitud', to: `/admin/solicitudes?q=${encodeURIComponent(operator.name)}` }]
+  }
   const last =
-    operator.status === 'Suspendido' ? { label: 'Reactivar' } : { label: 'Suspender', danger: true }
-  return [{ label: 'Ver perfil' }, { label: 'Ver experiencias' }, last]
+    operator.status === 'Suspendido'
+      ? { label: 'Reactivar', toggleTo: 'Activo' }
+      : { label: 'Suspender', toggleTo: 'Suspendido', danger: true }
+  return [
+    { label: 'Ver perfil', to: `/empresas/${operator.slug}` },
+    { label: 'Ver experiencias', to: `/empresas/${operator.slug}#experiencias` },
+    last,
+  ]
 }
 
 function OperatorsList() {
   const location = useLocation()
   const [query, setQuery] = useAdminSearch()
   const [status, setStatus] = useState(ALL)
+  const [operators, setOperators] = useState(initialOperators)
+  const [notice, setNotice] = useState('')
+
+  // Sin API todavía: el cambio de estado solo vive en esta pantalla.
+  function changeStatus(operator, nextStatus) {
+    setOperators((current) =>
+      current.map((item) => (item.id === operator.id ? { ...item, status: nextStatus } : item)),
+    )
+    setNotice(
+      nextStatus === 'Suspendido'
+        ? `${operator.name} quedó suspendido.`
+        : `${operator.name} volvió a estar activo.`,
+    )
+  }
 
   const term = query.trim().toLowerCase()
   const visible = operators
@@ -56,6 +79,7 @@ function OperatorsList() {
       />
 
       {location.state?.notice && <Notice tone="success">{location.state.notice}</Notice>}
+      {notice && <Notice tone="success">{notice}</Notice>}
 
       <div className="flex flex-wrap items-center gap-3">
         <SearchInput
@@ -111,16 +135,25 @@ function OperatorsList() {
                   </p>
                   <p className="text-sm text-ink">{operator.registeredAt}</p>
                   <div className="flex flex-wrap gap-2">
-                    {getActions(operator).map((action) => (
-                      <button
-                        key={action.label}
-                        type="button"
-                        aria-label={`${action.label} de ${operator.name}`}
-                        className={action.danger ? dangerAction : neutralAction}
-                      >
-                        {action.label}
-                      </button>
-                    ))}
+                    {getActions(operator).map((action) => {
+                      const label = `${action.label} de ${operator.name}`
+                      const className = action.danger ? dangerAction : neutralAction
+                      return action.to ? (
+                        <Link key={action.label} to={action.to} aria-label={label} className={className}>
+                          {action.label}
+                        </Link>
+                      ) : (
+                        <button
+                          key={action.label}
+                          type="button"
+                          aria-label={label}
+                          onClick={() => changeStatus(operator, action.toggleTo)}
+                          className={className}
+                        >
+                          {action.label}
+                        </button>
+                      )
+                    })}
                   </div>
                 </li>
               ))}

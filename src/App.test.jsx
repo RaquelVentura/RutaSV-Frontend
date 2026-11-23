@@ -133,7 +133,7 @@ describe('App', () => {
     expect(screen.queryByText('Atardecer y surf en El Tunco')).not.toBeInTheDocument()
 
     fireEvent.change(search, { target: { value: '' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Borrador' }))
+    fireEvent.change(screen.getByLabelText('Filtrar por estado'), { target: { value: 'Borrador' } })
     expect(screen.getByText('Caminata al volcán de Santa Ana')).toBeInTheDocument()
     expect(screen.queryByText('Ruta de café en Apaneca')).not.toBeInTheDocument()
   })
@@ -142,8 +142,8 @@ describe('App', () => {
     setRoleSession('OPERADOR')
     renderAt('/operador/experiencias/nueva')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar experiencia' }))
-    expect(screen.getByLabelText('Nombre de la experiencia')).toBeInvalid()
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar borrador' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('Escribe el nombre de la experiencia')
 
     fireEvent.change(screen.getByLabelText('Nombre de la experiencia'), {
       target: { value: 'Amanecer en el volcán' },
@@ -151,8 +151,11 @@ describe('App', () => {
     fireEvent.change(screen.getByLabelText('Categoría'), {
       target: { value: 'Naturaleza' },
     })
-    fireEvent.change(screen.getByLabelText('Departamento o zona'), {
+    fireEvent.change(screen.getByLabelText('Departamento'), {
       target: { value: 'Santa Ana' },
+    })
+    fireEvent.change(screen.getByLabelText('Municipio'), {
+      target: { value: 'Coatepeque' },
     })
     fireEvent.change(screen.getByLabelText('Precio por persona (USD)'), {
       target: { value: '35' },
@@ -163,18 +166,112 @@ describe('App', () => {
     fireEvent.change(screen.getByLabelText('Descripción'), {
       target: { value: 'Una caminata guiada al amanecer.' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar experiencia' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar borrador' }))
 
-    expect(screen.getByRole('status')).toHaveTextContent('guardados en este navegador')
+    expect(screen.getByRole('heading', { name: 'Mis experiencias' })).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Borrador «Amanecer en el volcán» guardado.')
     expect(readSaved('experiences')).toContainEqual(
       expect.objectContaining({
         title: 'Amanecer en el volcán',
         category: 'Naturaleza',
-        location: 'Santa Ana',
+        department: 'Santa Ana',
+        municipality: 'Coatepeque',
+        location: 'Coatepeque, Santa Ana',
         price: 35,
         capacity: 8,
+        status: 'Borrador',
       }),
     )
+  })
+
+  it('el municipio depende del departamento', () => {
+    setRoleSession('OPERADOR')
+    renderAt('/operador/experiencias/nueva')
+
+    const municipality = screen.getByLabelText('Municipio')
+    expect(municipality).toBeDisabled()
+
+    fireEvent.change(screen.getByLabelText('Departamento'), { target: { value: 'La Libertad' } })
+    expect(screen.getByLabelText('Municipio')).toBeEnabled()
+    expect(within(screen.getByLabelText('Municipio')).getByRole('option', { name: 'Tamanique' })).toBeInTheDocument()
+    expect(within(screen.getByLabelText('Municipio')).queryByRole('option', { name: 'Coatepeque' })).not.toBeInTheDocument()
+  })
+
+  it('exige mínimo 3 fotos para publicar y permite agregarlas', () => {
+    setRoleSession('OPERADOR')
+    renderAt('/operador/experiencias/nueva')
+
+    fireEvent.change(screen.getByLabelText('Nombre de la experiencia'), { target: { value: 'Yoga en la playa' } })
+    fireEvent.change(screen.getByLabelText('Categoría'), { target: { value: 'Playa' } })
+    fireEvent.change(screen.getByLabelText('Departamento'), { target: { value: 'La Libertad' } })
+    fireEvent.change(screen.getByLabelText('Municipio'), { target: { value: 'Tamanique' } })
+    fireEvent.change(screen.getByLabelText('Precio por persona (USD)'), { target: { value: '25' } })
+    fireEvent.change(screen.getByLabelText('Capacidad máxima'), { target: { value: '10' } })
+
+    expect(screen.getByText(/0 de 3 fotos mínimas/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Publicar experiencia' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('Sube al menos 3 fotos para publicar. Faltan 3.')
+
+    const files = ['a.jpg', 'b.jpg', 'c.png'].map(
+      (name) => new File(['x'], name, { type: name.endsWith('png') ? 'image/png' : 'image/jpeg' }),
+    )
+    fireEvent.change(screen.getByLabelText(/Agregar imágenes/), { target: { files } })
+    expect(screen.getByText(/3 fotos · Máximo 8 por experiencia/)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Publicar experiencia' }))
+    expect(screen.getByRole('status')).toHaveTextContent('«Yoga en la playa» quedó publicada.')
+    expect(readSaved('experiences')).toContainEqual(
+      expect.objectContaining({ title: 'Yoga en la playa', status: 'Publicada', photoCount: 3 }),
+    )
+  })
+
+  it('desactiva una experiencia con confirmación y permite reactivarla', () => {
+    setRoleSession('OPERADOR')
+    renderAt('/operador/experiencias')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Desactivar Atardecer y surf en El Tunco' }))
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText('¿Desactivar esta experiencia?')).toBeInTheDocument()
+
+    // Cancelar no cambia nada.
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Desactivar Atardecer y surf en El Tunco' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Desactivar' }))
+
+    expect(screen.getByRole('status')).toHaveTextContent('«Atardecer y surf en El Tunco» quedó desactivada.')
+    expect(readSaved('experiences').find((item) => item.id === 1)).toMatchObject({
+      status: 'Desactivada',
+      previousStatus: 'Publicada',
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reactivar Atardecer y surf en El Tunco' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Reactivar' }))
+    expect(readSaved('experiences').find((item) => item.id === 1).status).toBe('Publicada')
+  })
+
+  it('no crea la misma experiencia varias veces al volver a enviar', () => {
+    setRoleSession('OPERADOR')
+    renderAt('/operador/experiencias/nueva')
+
+    fireEvent.change(screen.getByLabelText('Nombre de la experiencia'), { target: { value: 'Solo una vez' } })
+    const draft = screen.getByRole('button', { name: 'Guardar borrador' })
+    fireEvent.click(draft)
+    fireEvent.click(draft)
+
+    expect(readSaved('experiences').filter((item) => item.title === 'Solo una vez')).toHaveLength(1)
+  })
+
+  it('rechaza archivos que no son JPG o PNG', () => {
+    setRoleSession('OPERADOR')
+    renderAt('/operador/experiencias/nueva')
+
+    fireEvent.change(screen.getByLabelText(/Agregar imágenes/), {
+      target: { files: [new File(['x'], 'documento.pdf', { type: 'application/pdf' })] },
+    })
+
+    expect(screen.getByRole('alert')).toHaveTextContent('no es JPG ni PNG')
   })
 
   it('carga y guarda los cambios al editar una experiencia', () => {
@@ -182,15 +279,16 @@ describe('App', () => {
     renderAt('/operador/experiencias/nueva?editar=1')
 
     expect(screen.getByRole('heading', { name: 'Editar experiencia' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Departamento')).toHaveValue('La Libertad')
     fireEvent.change(screen.getByLabelText('Nombre de la experiencia'), {
       target: { value: 'Surf al atardecer' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar borrador' }))
 
     expect(readSaved('experiences').find((item) => item.id === 1).title).toBe(
       'Surf al atardecer',
     )
-    expect(screen.getByRole('status')).toHaveTextContent('Cambios guardados')
+    expect(screen.getByRole('status')).toHaveTextContent('Cambios guardados en «Surf al atardecer».')
   })
 
   it('muestra cupos y filtra reservas por estado', () => {
@@ -202,9 +300,38 @@ describe('App', () => {
     unmount()
     renderAt('/operador/reservas')
     expect(screen.getByRole('heading', { name: 'Historial de Reservas' })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Pendiente' }))
+    fireEvent.change(screen.getByLabelText('Filtrar reservas por estado'), { target: { value: 'Pendiente' } })
     expect(screen.getByText('Daniel Rivera')).toBeInTheDocument()
     expect(screen.queryByText('María López')).not.toBeInTheDocument()
+  })
+
+  it('muestra el calendario de cupos con el detalle del día seleccionado', () => {
+    setRoleSession('OPERADOR')
+    renderAt('/operador/cupos')
+
+    const calendar = screen.getByRole('region', { name: 'Calendario de disponibilidad' })
+    expect(within(calendar).getByRole('heading', { name: /noviembre de 2026/i })).toBeInTheDocument()
+    expect(within(calendar).getByRole('button', { name: '14 de noviembre, 6 de 8 cupos' })).toBeInTheDocument()
+    expect(within(calendar).getByRole('button', { name: '2 de noviembre, sin sesiones' })).toBeInTheDocument()
+
+    fireEvent.click(within(calendar).getByRole('button', { name: '21 de noviembre, 4 de 8 cupos' }))
+    const detail = screen.getByRole('region', { name: 'Fecha seleccionada' })
+    expect(within(detail).getByText(/sábado, 21 de noviembre de 2026/i)).toBeInTheDocument()
+    expect(within(detail).getByText('4 de 8 espacios disponibles')).toBeInTheDocument()
+
+    fireEvent.click(within(detail).getByRole('button', { name: 'Editar cupos' }))
+    expect(screen.getByLabelText('Cupos disponibles')).toHaveValue(4)
+
+    fireEvent.click(within(calendar).getByRole('button', { name: 'Siguiente ›' }))
+    expect(within(calendar).getByRole('heading', { name: /diciembre de 2026/i })).toBeInTheDocument()
+  })
+
+  it('el resumen del operador muestra el calendario de disponibilidad', () => {
+    setRoleSession('OPERADOR')
+    renderAt('/operador')
+
+    expect(screen.getByRole('region', { name: 'Calendario de disponibilidad' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /editar cupos/i })).toHaveAttribute('href', '/operador/cupos')
   })
 
   it('permite añadir una fecha, hora y cupos disponibles', () => {

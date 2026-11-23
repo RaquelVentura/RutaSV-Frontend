@@ -1,6 +1,7 @@
 //PANEL DE CUPOS DE EXPERIENCIAS
 
 import { useMemo, useState } from 'react'
+import CuposCalendar from '../../components/operator/CuposCalendar.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 import {
   readOperatorCollection,
@@ -10,7 +11,7 @@ import {
 const fieldClass =
   'min-h-12 w-full rounded-xl border border-black/15 bg-white px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/15'
 
-function AvailabilityForm({ item, experiences, onCancel, onSave }) {
+function AvailabilityForm({ item, experiences, defaultDate = '', onCancel, onSave }) {
   function handleSubmit(event) {
     event.preventDefault()
     const formData = new FormData(event.currentTarget)
@@ -49,7 +50,7 @@ function AvailabilityForm({ item, experiences, onCancel, onSave }) {
       </div>
       <div className="grid gap-2">
         <label htmlFor="availability-form-date" className="text-sm font-semibold text-ink">Día</label>
-        <input id="availability-form-date" name="date" type="date" required defaultValue={item?.date ?? ''} className={fieldClass} />
+        <input id="availability-form-date" name="date" type="date" required defaultValue={item?.date ?? defaultDate} className={fieldClass} />
       </div>
       <div className="grid gap-2">
         <label htmlFor="availability-form-time" className="text-sm font-semibold text-ink">Hora</label>
@@ -77,6 +78,26 @@ function AvailabilityForm({ item, experiences, onCancel, onSave }) {
   )
 }
 
+const longDateFormatter = new Intl.DateTimeFormat('es-SV', {
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+})
+
+// Día que se muestra al abrir: la próxima sesión o, si no hay, la última cargada.
+function pickInitialDate(rows) {
+  if (rows.length === 0) return ''
+  const sorted = [...rows].map((row) => row.date).sort()
+  const today = new Date().toISOString().slice(0, 10)
+  return sorted.find((date) => date >= today) ?? sorted[sorted.length - 1]
+}
+
+function monthOf(isoDate) {
+  const base = isoDate ? new Date(`${isoDate}T00:00:00`) : new Date()
+  return { year: base.getFullYear(), month: base.getMonth() }
+}
+
 function OperatorAvailability() {
   const { user } = useAuth()
   const { experiences, initialRows } = useMemo(
@@ -91,11 +112,14 @@ function OperatorAvailability() {
   const [editingId, setEditingId] = useState(null)
   const [adding, setAdding] = useState(false)
   const [notice, setNotice] = useState(null)
+  const [selectedDate, setSelectedDate] = useState(() => pickInitialDate(initialRows))
   const experienceById = new Map(experiences.map((experience) => [String(experience.id), experience]))
   const filteredRows = rows.filter((item) => {
     if (selectedExperience === 'Todas') return true
     return String(item.experienceId) === selectedExperience
   })
+
+  const dayRows = filteredRows.filter((item) => item.date === selectedDate)
 
   function persist(updatedRows) {
     saveOperatorCollection(user, 'availability', updatedRows)
@@ -173,6 +197,7 @@ function OperatorAvailability() {
       {adding && experiences.length > 0 && (
         <AvailabilityForm
           experiences={experiences}
+          defaultDate={selectedDate}
           onCancel={() => setAdding(false)}
           onSave={handleSave}
         />
@@ -196,56 +221,73 @@ function OperatorAvailability() {
         </p>
       )}
 
-      <section className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
-        {filteredRows.map((item) => {
-          const experience = experienceById.get(String(item.experienceId))
-          const date = new Date(`${item.date}T00:00:00`)
-          const formattedDate = Number.isNaN(date.getTime())
-            ? item.date
-            : new Intl.DateTimeFormat('es-SV', {
-                weekday: 'long',
-                day: 'numeric',
-                month: 'long',
-              }).format(date)
+      <CuposCalendar
+        rows={filteredRows}
+        selectedDate={selectedDate}
+        onSelect={(date) => {
+          setSelectedDate(date)
+          setEditingId(null)
+        }}
+        initialMonth={monthOf(selectedDate)}
+      />
 
-          return (
-            <article key={item.id} className="flex min-h-44 flex-col justify-between rounded-2xl border border-black/10 bg-white p-5 shadow-sm lg:p-6">
-              <div>
-                <p className="text-base font-bold capitalize text-ink">{formattedDate} · {item.time}</p>
-                <p className="mt-2 text-sm text-muted">{experience?.title ?? 'Experiencia no disponible'}</p>
-              </div>
-              <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-black/10 pt-4">
-                <span className="text-sm font-semibold text-brand">
-                  {item.available} de {item.capacity} espacios disponibles
-                </span>
-                <button
-                  type="button"
-                  aria-expanded={editingId === item.id}
-                  onClick={() => {
-                    setEditingId((current) => current === item.id ? null : item.id)
-                    setAdding(false)
-                    setNotice(null)
-                  }}
-                  className="text-sm font-semibold text-brand hover:underline"
-                >
-                  {editingId === item.id ? 'Cerrar edición' : 'Editar cupos'}
-                </button>
-              </div>
-              {editingId === item.id && (
-                <div className="mt-5 border-t border-black/10 pt-5">
-                  <AvailabilityForm
-                    item={item}
-                    experiences={experiences}
-                    onCancel={() => setEditingId(null)}
-                    onSave={handleSave}
-                  />
+      <section aria-label="Fecha seleccionada" className="rounded-2xl bg-info-soft p-5 lg:p-7">
+        {selectedDate ? (
+          <>
+            <h2 className="text-lg font-bold capitalize text-ink">
+              {longDateFormatter.format(new Date(`${selectedDate}T00:00:00`))}
+            </h2>
+            <p className="mt-1 text-sm text-muted">
+              {dayRows.length === 0
+                ? 'No hay sesiones este día.'
+                : `${dayRows.length} ${dayRows.length === 1 ? 'sesión' : 'sesiones'} con cupos cargados.`}
+            </p>
+          </>
+        ) : (
+          <p className="text-sm text-muted">Selecciona un día del calendario para ver sus sesiones.</p>
+        )}
+
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          {dayRows.map((item) => {
+            const experience = experienceById.get(String(item.experienceId))
+            return (
+              <article key={item.id} className="flex flex-col justify-between rounded-2xl border border-black/10 bg-white p-5 shadow-sm">
+                <div>
+                  <p className="text-base font-bold text-ink">{item.time} · {experience?.title ?? 'Experiencia no disponible'}</p>
                 </div>
-              )}
-            </article>
-          )
-        })}
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-black/10 pt-4">
+                  <span className="text-sm font-semibold text-brand">
+                    {item.available} de {item.capacity} espacios disponibles
+                  </span>
+                  <button
+                    type="button"
+                    aria-expanded={editingId === item.id}
+                    onClick={() => {
+                      setEditingId((current) => current === item.id ? null : item.id)
+                      setAdding(false)
+                      setNotice(null)
+                    }}
+                    className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark"
+                  >
+                    {editingId === item.id ? 'Cerrar edición' : 'Editar cupos'}
+                  </button>
+                </div>
+                {editingId === item.id && (
+                  <div className="mt-5 border-t border-black/10 pt-5">
+                    <AvailabilityForm
+                      item={item}
+                      experiences={experiences}
+                      onCancel={() => setEditingId(null)}
+                      onSave={handleSave}
+                    />
+                  </div>
+                )}
+              </article>
+            )
+          })}
+        </div>
         {!filteredRows.length && (
-          <p className="rounded-2xl border border-dashed border-black/20 bg-white px-4 py-12 text-center text-sm text-muted md:col-span-2 2xl:col-span-3">
+          <p className="mt-4 rounded-2xl border border-dashed border-black/20 bg-white px-4 py-8 text-center text-sm text-muted">
             No hay fechas disponibles para esta experiencia.
           </p>
         )}

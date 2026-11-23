@@ -5,6 +5,7 @@ function ReservationStatus({ status }) {
     Confirmada: 'bg-success-soft text-success',
     Pendiente: 'bg-amber-50 text-amber-800',
     Completada: 'bg-stone-100 text-stone-700',
+    Cancelada: 'bg-danger-soft text-danger',
   }
 
   return (

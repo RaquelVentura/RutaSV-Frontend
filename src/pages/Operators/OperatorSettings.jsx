@@ -141,7 +141,7 @@ function OperatorSettings() {
       )}
       <button
         type="submit"
-        className="min-h-12 w-full rounded-xl bg-brand px-4 py-3 text-sm font-bold text-white transition hover:bg-brand-dark lg:col-span-2"
+        className="min-h-12 justify-self-end rounded-xl bg-brand px-8 py-3 text-sm font-bold text-white transition hover:bg-brand-dark lg:col-span-2"
       >
         Guardar cambios
       </button>

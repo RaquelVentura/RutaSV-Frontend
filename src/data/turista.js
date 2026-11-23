@@ -1,17 +1,23 @@
 // Datos de ejemplo para las vistas de Turista. Cuando exista el backend,
 // reemplaza estas constantes por llamadas a apiFetch (src/lib/api.js).
-// Las imágenes se exportan desde Figma a /public (ver README-turista.md).
+// Las fotos salen de src/assets/home y los íconos de public/icons/turista.
 
-const photo = (name) => `/images/turista/${name}`;
+import heroImage from '../assets/home/hero.jpg';
+import cafeImage from '../assets/home/exp-apaneca.jpg';
+import atacoImage from '../assets/home/exp-ataco.jpg';
+import planImage from '../assets/home/dest-libertad.jpg';
+import surfImage from '../assets/home/exp-tunco.jpg';
+import volcanImage from '../assets/home/cat-volcanes.jpg';
+
 const icon = (name) => `/icons/turista/${name}`;
 
 export const assets = {
-  hero: photo('hero.png'),
-  surf: photo('surf.png'),
-  cafe: photo('cafe.png'),
-  ataco: photo('ataco.png'),
-  volcan: photo('volcan.png'),
-  plan: photo('plan-fin-de-semana.png'),
+  hero: heroImage,
+  surf: surfImage,
+  cafe: cafeImage,
+  ataco: atacoImage,
+  volcan: volcanImage,
+  plan: planImage,
   pin: icon('pin.svg'),
   local: icon('local.svg'),
   groups: icon('groups.svg'),
@@ -25,6 +31,7 @@ export const assets = {
 export const experiences = [
   {
     id: 'surf-el-tunco',
+    slug: 'surf-atardecer-el-tunco',
     title: 'Surf al atardecer en El Tunco',
     location: 'El Tunco, La Libertad',
     rating: 4.9,
@@ -37,6 +44,7 @@ export const experiences = [
   },
   {
     id: 'cafe-apaneca',
+    slug: 'cafetal-a-tu-taza-apaneca',
     title: 'Del cafetal a tu taza en Apaneca',
     location: 'Apaneca, Ahuachapán',
     rating: 4.9,
@@ -48,6 +56,7 @@ export const experiences = [
   },
   {
     id: 'ataco',
+    slug: 'colores-y-sabores-ataco',
     title: 'Colores y sabores de Ataco',
     location: 'Ataco, Ahuachapán',
     rating: 4.8,
@@ -114,8 +123,8 @@ export const defaultBooking = {
   reference: 'RSV-261121-0842',
   freeCancelUntil: '19 nov 2026 a las 15:00',
   operatorPhone: '+503 7890 1234',
-  contactName: 'Ana López',
-  contactEmail: 'ana.lopez@correo.com',
+  contactName: '',
+  contactEmail: '',
 };
 
 export const paymentMethods = [

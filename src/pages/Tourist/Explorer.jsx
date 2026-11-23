@@ -72,7 +72,7 @@ export default function Explorar() {
           </Link>
           <div className="grid w-full gap-6 text-left md:grid-cols-2 lg:grid-cols-3">
             {featured.map((experience) => (
-              <ExperienceCard key={experience.id} experience={experience} to="/turista/reservar" />
+              <ExperienceCard key={experience.id} experience={experience} to={experience.slug ? `/experiencias/${experience.slug}` : undefined} />
             ))}
           </div>
         </section>

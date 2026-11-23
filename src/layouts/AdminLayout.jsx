@@ -17,9 +17,13 @@ const sections = [
   { label: 'Operadores', to: '/admin/operadores' },
 ]
 
-const pillClass = ({ isActive }) =>
-  `rounded-full px-4 py-1.5 text-xs font-semibold transition-colors ${
-    isActive ? 'bg-brand text-white' : 'border border-mist bg-surface text-ink hover:bg-canvas'
+// Enlaces del encabezado: sin forma de botón; solo el hover y el subrayado de la
+// sección activa los distinguen.
+const sectionClass = ({ isActive }) =>
+  `rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
+    isActive
+      ? 'text-brand underline decoration-2 underline-offset-8'
+      : 'text-ink hover:bg-canvas hover:text-brand'
   }`
 
 function AdminLayout() {
@@ -41,7 +45,7 @@ function AdminLayout() {
   return (
     <div className="flex min-h-screen flex-col bg-canvas text-ink">
       <header className="border-b border-mist bg-surface">
-        <nav className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-8 gap-y-3 px-6 py-4">
+        <div className="flex w-full flex-wrap items-center gap-x-6 gap-y-2 px-6 py-3">
           <Link to="/admin" className="text-2xl font-extrabold text-brand">
             RutaSV
           </Link>
@@ -57,6 +61,14 @@ function AdminLayout() {
             />
           </form>
 
+          <nav aria-label="Secciones del panel" className="flex flex-wrap items-center gap-1">
+            {sections.map((section) => (
+              <NavLink key={section.label} to={section.to} end={section.end} className={sectionClass}>
+                {section.label}
+              </NavLink>
+            ))}
+          </nav>
+
           <div className="ml-auto flex items-center gap-4">
             <span className="hidden text-xs font-semibold text-brand sm:inline">ES / EN ▾</span>
             <UserMenu
@@ -65,24 +77,7 @@ function AdminLayout() {
               onLogout={logout}
             />
           </div>
-        </nav>
-
-        <nav
-          aria-label="Secciones del panel"
-          className="mx-auto flex max-w-6xl flex-wrap gap-2 px-6 pb-4"
-        >
-          {sections.map((section) =>
-            section.to ? (
-              <NavLink key={section.label} to={section.to} end={section.end} className={pillClass}>
-                {section.label}
-              </NavLink>
-            ) : (
-              <button key={section.label} type="button" className={pillClass({ isActive: false })}>
-                {section.label}
-              </button>
-            ),
-          )}
-        </nav>
+        </div>
       </header>
       <main className="flex-1">
         <Container className="py-8">

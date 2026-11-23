@@ -9,7 +9,7 @@ function MainLayout() {
   return (
     <div className="flex min-h-screen flex-col bg-canvas text-ink">
       <NavBar user={user} onLogout={logout} onMenuOpen={refreshSession} />
-      <main className="w-full max-w-none flex-1 py-10">
+      <main className="w-full max-w-none flex-1 pb-10">
         <Outlet />
       </main>
       <Footer />

@@ -23,3 +23,139 @@ body {
   background-color: var(--color-canvas);
   color: var(--color-ink);
 }
+
+/* Animación del logotipo de acceso: cada parte entra en su momento */
+.logo-part {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation-fill-mode: forwards;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.logo-pin {
+  animation: logo-pop 0.6s 0.1s forwards;
+}
+
+.logo-water {
+  animation: logo-water 0.7s 3.2s forwards;
+}
+
+.logo-leaves {
+  animation: logo-leaves 0.8s 3.5s forwards;
+}
+
+.logo-case {
+  animation: logo-case 0.7s 3.9s forwards;
+}
+
+.logo-letters {
+  animation: logo-letters 0.8s 4.5s forwards;
+}
+
+@keyframes logo-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes logo-water {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes logo-leaves {
+  from {
+    opacity: 0;
+    transform: translateX(-24px) rotate(-14deg) scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes logo-case {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes logo-letters {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Barra de precio con dos círculos (mínimo y máximo) */
+.range-thumb {
+  pointer-events: none;
+  appearance: none;
+  background: transparent;
+}
+
+.range-thumb::-webkit-slider-runnable-track {
+  background: transparent;
+}
+
+.range-thumb::-moz-range-track {
+  background: transparent;
+}
+
+.range-thumb::-webkit-slider-thumb {
+  pointer-events: auto;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 9999px;
+  border: 3px solid #ffffff;
+  background: var(--color-brand);
+  box-shadow: 0 1px 4px rgb(16 47 59 / 0.35);
+  cursor: grab;
+}
+
+.range-thumb::-moz-range-thumb {
+  pointer-events: auto;
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  border: 3px solid #ffffff;
+  background: var(--color-brand);
+  box-shadow: 0 1px 4px rgb(16 47 59 / 0.35);
+  cursor: grab;
+}
+
+.range-thumb:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+.range-thumb:focus-visible::-moz-range-thumb {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}

@@ -1,11 +1,17 @@
 //panel de  historial dereservas 
 
 import { useMemo, useState } from 'react'
+import FilterSelect from '../../components/admin/FilterSelect.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { readOperatorCollection } from './operatorRepository.js'
 import ReservationStatus from './ReservationStatus.jsx'
 
-const filters = ['Todas', 'Pendiente', 'Confirmada', 'Completada']
+const filterOptions = [
+  { value: 'Todas', label: 'Estado: todas' },
+  { value: 'Pendiente', label: 'Pendiente' },
+  { value: 'Confirmada', label: 'Confirmada' },
+  { value: 'Completada', label: 'Completada' },
+]
 
 function OperatorReservations() {
   const { user } = useAuth()
@@ -52,23 +58,13 @@ function OperatorReservations() {
             className="min-h-12 w-full rounded-xl border border-black/15 bg-white px-4 text-sm text-ink outline-none placeholder:text-muted focus:border-brand focus:ring-2 focus:ring-brand/15"
           />
         </div>
-        <div className="flex gap-2 overflow-x-auto pb-1" aria-label="Filtrar reservas">
-          {filters.map((item) => (
-            <button
-              key={item}
-              type="button"
-              aria-pressed={filter === item}
-              onClick={() => setFilter(item)}
-              className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold ${
-                filter === item
-                  ? 'bg-brand text-white'
-                  : 'bg-canvas text-muted hover:text-brand'
-              }`}
-            >
-              {item}
-            </button>
-          ))}
-        </div>
+        <FilterSelect
+          label="Filtrar reservas por estado"
+          options={filterOptions}
+          value={filter}
+          onChange={(event) => setFilter(event.target.value)}
+          className="min-h-12 md:w-56"
+        />
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3" aria-label="Reservas">

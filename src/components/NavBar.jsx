@@ -18,7 +18,7 @@ function NavBar({ user = null, onLogout, onMenuOpen }) {
 
   return (
     <header className="border-b border-mist bg-surface">
-      <nav className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-3 px-6 py-4">
+      <nav className="flex w-full flex-wrap items-center gap-x-6 gap-y-3 px-6 py-4">
         <Link to="/" className="text-2xl font-extrabold text-brand">
           RutaSV
         </Link>

@@ -3,6 +3,7 @@
 export const operators = [
   {
     id: 'op-1',
+    slug: 'olas-de-el-tunco',
     name: 'Olas de El Tunco',
     email: 'contacto@olaseltunco.sv',
     status: 'Activo',
@@ -11,6 +12,7 @@ export const operators = [
   },
   {
     id: 'op-2',
+    slug: 'raices-de-cafe',
     name: 'Raíces de Café',
     email: 'hola@raicesdecafe.sv',
     status: 'Activo',
@@ -19,6 +21,7 @@ export const operators = [
   },
   {
     id: 'op-3',
+    slug: 'ataco-a-pie',
     name: 'Ataco a pie',
     email: 'info@atacoapie.sv',
     status: 'Activo',
@@ -35,6 +38,7 @@ export const operators = [
   },
   {
     id: 'op-5',
+    slug: 'ruta-del-lago',
     name: 'Ruta del Lago',
     email: 'equipo@rutadellago.sv',
     status: 'Suspendido',

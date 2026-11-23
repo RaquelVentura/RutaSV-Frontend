@@ -2,7 +2,7 @@ import LinkButton from '../components/LinkButton.jsx'
 
 function Forbidden() {
   return (
-    <section>
+    <section className="w-full px-6 pt-6">
       <h1 className="text-3xl font-extrabold text-ink">Sin permiso</h1>
       <p className="mt-2 text-muted">
         Tu cuenta no tiene acceso a esta sección.

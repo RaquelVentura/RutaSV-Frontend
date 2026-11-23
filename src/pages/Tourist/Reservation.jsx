@@ -1,6 +1,7 @@
 
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext.jsx';
 import Container from '../../components/turista/Container.jsx';
 import { defaultBooking, formatUsd, paymentMethods } from '../../data/turista.js';
 
@@ -75,10 +76,18 @@ function StepIndicator() {
 
  function Reservation() {
   const navigate = useNavigate();
-  const booking = defaultBooking;
+  const routeLocation = useLocation();
+  // La reserva llega desde el detalle de la experiencia; sin ella se usa el ejemplo.
+  const booking = routeLocation.state?.booking ?? defaultBooking;
   const { experience, people } = booking;
 
-  const [contact, setContact] = useState({ name: '', email: '', phone: '', message: '' });
+  const { user } = useAuth();
+  const [contact, setContact] = useState(() => ({
+    name: user?.fullName ?? '',
+    email: user?.email ?? '',
+    phone: '',
+    message: '',
+  }));
   const [method, setMethod] = useState('card');
   const [card, setCard] = useState({ number: '', holder: '', expiry: '', cvv: '' });
   const [accepted, setAccepted] = useState(false);
@@ -148,13 +157,13 @@ function StepIndicator() {
               Aquí recibirás la confirmación y los detalles del encuentro.
             </p>
             <Field id="field-name" label="Nombre completo" error={errors.name}>
-              <input id="field-name" autoComplete="name" value={contact.name} onChange={updateContact('name')} placeholder="Ana López" aria-invalid={Boolean(errors.name)} className={`${inputClass} ${borderFor('name')}`} />
+              <input id="field-name" autoComplete="name" value={contact.name} onChange={updateContact('name')} placeholder="Escribe tu nombre completo" aria-invalid={Boolean(errors.name)} className={`${inputClass} ${borderFor('name')}`} />
             </Field>
             <Field id="field-email" label="Correo electrónico" error={errors.email}>
-              <input id="field-email" type="email" autoComplete="email" value={contact.email} onChange={updateContact('email')} placeholder="ana.lopez@correo.com" aria-invalid={Boolean(errors.email)} className={`${inputClass} ${borderFor('email')}`} />
+              <input id="field-email" type="email" autoComplete="email" value={contact.email} onChange={updateContact('email')} placeholder="nombre@correo.com" aria-invalid={Boolean(errors.email)} className={`${inputClass} ${borderFor('email')}`} />
             </Field>
             <Field id="field-phone" label="Teléfono" error={errors.phone}>
-              <input id="field-phone" type="tel" autoComplete="tel" value={contact.phone} onChange={updateContact('phone')} placeholder="+503 7123 4567" aria-invalid={Boolean(errors.phone)} className={`${inputClass} ${borderFor('phone')}`} />
+              <input id="field-phone" type="tel" autoComplete="tel" value={contact.phone} onChange={updateContact('phone')} placeholder="+503 7000 0000" aria-invalid={Boolean(errors.phone)} className={`${inputClass} ${borderFor('phone')}`} />
             </Field>
             <Field id="field-message" label="Mensaje al operador (opcional)">
               <textarea id="field-message" rows={4} value={contact.message} onChange={updateContact('message')} placeholder="Es nuestra primera clase de surf. ¡Nos emociona conocer El Tunco!" className={`${inputClass} min-h-[112px] resize-y border-[#DFE8EB]`} />
