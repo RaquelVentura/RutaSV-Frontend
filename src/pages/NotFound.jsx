@@ -2,7 +2,7 @@ import LinkButton from '../components/LinkButton.jsx'
 
 function NotFound() {
   return (
-    <section>
+    <section className="w-full px-6 pt-6">
       <h1 className="text-3xl font-extrabold text-ink">Página no encontrada</h1>
       <p className="mt-2 text-muted">La ruta que buscas no existe.</p>
       <LinkButton to="/" className="mt-6">

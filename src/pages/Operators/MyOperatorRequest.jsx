@@ -153,7 +153,7 @@ export default function MyOperatorRequest() {
 
   if (error && !request) {
     return (
-      <section className="mx-auto max-w-3xl space-y-4">
+      <section className="w-full space-y-4 px-6 pt-6">
         <div
           role="alert"
           className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"
@@ -172,7 +172,7 @@ export default function MyOperatorRequest() {
 
   if (!request) {
     return (
-      <section className="mx-auto max-w-3xl rounded-3xl border border-stone-200 bg-white p-8 shadow-xs">
+      <section className="mx-6 mt-6 rounded-3xl border border-stone-200 bg-white p-8 shadow-xs">
         <span className="inline-block rounded-full bg-cyan-50 px-3 py-1 text-xs font-bold tracking-wide text-[#087E9A] uppercase">
           Conviértete en operador
         </span>
@@ -235,7 +235,7 @@ export default function MyOperatorRequest() {
     status === OperatorRequestStatus.RECHAZADA
 
   return (
-    <section className="mx-auto max-w-4xl space-y-6">
+    <section className="w-full space-y-6 px-6 pt-6">
       {noticeMessage && (
         <div
           role="status"

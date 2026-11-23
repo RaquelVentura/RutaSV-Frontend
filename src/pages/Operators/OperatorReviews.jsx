@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import FilterSelect from '../../components/admin/FilterSelect.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 import {
   readOperatorCollection,
@@ -72,15 +73,14 @@ function OperatorReviews() {
         <label htmlFor="review-experience" className="sr-only">
           Filtrar reseñas por experiencia
         </label>
-        <select
+        <FilterSelect
           id="review-experience"
+          options={['Todas las experiencias', ...experienceOptions]}
           value={experience}
           onChange={(event) => setExperience(event.target.value)}
-          className="min-h-12 w-full rounded-xl border border-black/15 bg-white px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/15"
-        >
-          <option>Todas las experiencias</option>
-          {experienceOptions.map((option) => <option key={option}>{option}</option>)}
-        </select>
+          className="min-h-12"
+          wrapperClassName="block w-full"
+        />
       </section>
 
       {notice && (

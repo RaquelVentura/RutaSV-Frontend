@@ -133,7 +133,7 @@ describe('App', () => {
     expect(screen.queryByText('Atardecer y surf en El Tunco')).not.toBeInTheDocument()
 
     fireEvent.change(search, { target: { value: '' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Borrador' }))
+    fireEvent.change(screen.getByLabelText('Filtrar por estado'), { target: { value: 'Borrador' } })
     expect(screen.getByText('Caminata al volcán de Santa Ana')).toBeInTheDocument()
     expect(screen.queryByText('Ruta de café en Apaneca')).not.toBeInTheDocument()
   })
@@ -142,8 +142,8 @@ describe('App', () => {
     setRoleSession('OPERADOR')
     renderAt('/operador/experiencias/nueva')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar experiencia' }))
-    expect(screen.getByLabelText('Nombre de la experiencia')).toBeInvalid()
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar borrador' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('Escribe el nombre de la experiencia')
 
     fireEvent.change(screen.getByLabelText('Nombre de la experiencia'), {
       target: { value: 'Amanecer en el volcán' },
@@ -151,8 +151,11 @@ describe('App', () => {
     fireEvent.change(screen.getByLabelText('Categoría'), {
       target: { value: 'Naturaleza' },
     })
-    fireEvent.change(screen.getByLabelText('Departamento o zona'), {
+    fireEvent.change(screen.getByLabelText('Departamento'), {
       target: { value: 'Santa Ana' },
+    })
+    fireEvent.change(screen.getByLabelText('Municipio'), {
+      target: { value: 'Coatepeque' },
     })
     fireEvent.change(screen.getByLabelText('Precio por persona (USD)'), {
       target: { value: '35' },
@@ -163,18 +166,320 @@ describe('App', () => {
     fireEvent.change(screen.getByLabelText('Descripción'), {
       target: { value: 'Una caminata guiada al amanecer.' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar experiencia' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar borrador' }))
 
-    expect(screen.getByRole('status')).toHaveTextContent('guardados en este navegador')
+    expect(screen.getByRole('heading', { name: 'Mis experiencias' })).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Borrador «Amanecer en el volcán» guardado.')
     expect(readSaved('experiences')).toContainEqual(
       expect.objectContaining({
         title: 'Amanecer en el volcán',
         category: 'Naturaleza',
-        location: 'Santa Ana',
+        department: 'Santa Ana',
+        municipality: 'Coatepeque',
+        location: 'Coatepeque, Santa Ana',
         price: 35,
         capacity: 8,
+        status: 'Borrador',
       }),
     )
+  })
+
+  it('el municipio depende del departamento', () => {
+    setRoleSession('OPERADOR')
+    renderAt('/operador/experiencias/nueva')
+
+    const municipality = screen.getByLabelText('Municipio')
+    expect(municipality).toBeDisabled()
+
+    fireEvent.change(screen.getByLabelText('Departamento'), { target: { value: 'La Libertad' } })
+    expect(screen.getByLabelText('Municipio')).toBeEnabled()
+    expect(within(screen.getByLabelText('Municipio')).getByRole('option', { name: 'Tamanique' })).toBeInTheDocument()
+    expect(within(screen.getByLabelText('Municipio')).queryByRole('option', { name: 'Coatepeque' })).not.toBeInTheDocument()
+  })
+
+  it('deshabilita Publicar hasta completar el checklist y publica con ubicación y 3 fotos', () => {
+    setRoleSession('OPERADOR')
+    renderAt('/operador/experiencias/nueva')
+
+    const publish = screen.getByRole('button', { name: 'Publicar experiencia' })
+    expect(publish).toBeDisabled()
+    expect(screen.getByRole('heading', { name: 'Completa para publicar' })).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Nombre de la experiencia'), { target: { value: 'Yoga en la playa' } })
+    fireEvent.change(screen.getByLabelText('Categoría'), { target: { value: 'Playa' } })
+    fireEvent.change(screen.getByLabelText('Departamento'), { target: { value: 'La Libertad' } })
+    fireEvent.change(screen.getByLabelText('Municipio'), { target: { value: 'Tamanique' } })
+    fireEvent.change(screen.getByLabelText('Precio por persona (USD)'), { target: { value: '25' } })
+    fireEvent.change(screen.getByLabelText('Capacidad máxima'), { target: { value: '10' } })
+    fireEvent.change(screen.getByLabelText('Descripción'), { target: { value: 'Yoga frente al mar.' } })
+
+    expect(screen.getByText(/0 de 3 fotos mínimas/)).toBeInTheDocument()
+    expect(publish).toBeDisabled()
+    expect(screen.getByText(/Mínimo 3 fotos/)).toHaveTextContent('pendiente')
+
+    const files = ['a.jpg', 'b.jpg', 'c.png'].map(
+      (name) => new File(['x'], name, { type: name.endsWith('png') ? 'image/png' : 'image/jpeg' }),
+    )
+    fireEvent.change(screen.getByLabelText(/Agregar imágenes/), { target: { files } })
+    expect(screen.getByText(/3 fotos · Máximo 8 por experiencia/)).toBeInTheDocument()
+    // Faltaba la ubicación: sigue deshabilitado.
+    expect(publish).toBeDisabled()
+
+    // Fuera de El Salvador no cuenta.
+    fireEvent.change(screen.getByLabelText('Latitud'), { target: { value: '40.4' } })
+    fireEvent.change(screen.getByLabelText('Longitud'), { target: { value: '-3.7' } })
+    expect(screen.getByRole('alert')).toHaveTextContent('fuera de El Salvador')
+    expect(publish).toBeDisabled()
+
+    fireEvent.change(screen.getByLabelText('Latitud'), { target: { value: '13.49' } })
+    fireEvent.change(screen.getByLabelText('Longitud'), { target: { value: '-89.38' } })
+    expect(publish).toBeEnabled()
+
+    fireEvent.click(publish)
+    expect(screen.getByRole('status')).toHaveTextContent('«Yoga en la playa» quedó publicada.')
+    expect(readSaved('experiences')).toContainEqual(
+      expect.objectContaining({ title: 'Yoga en la playa', status: 'Publicada', photoCount: 3, lat: 13.49, lng: -89.38 }),
+    )
+  })
+
+  it('permite elegir otra foto como portada y reordenarlas', () => {
+    setRoleSession('OPERADOR')
+    renderAt('/operador/experiencias/nueva')
+
+    const files = ['a.jpg', 'b.jpg', 'c.jpg'].map((name) => new File(['x'], name, { type: 'image/jpeg' }))
+    fireEvent.change(screen.getByLabelText(/Agregar imágenes/), { target: { files } })
+
+    const slots = () => screen.getAllByRole('listitem').filter((item) => item.className.includes('h-32'))
+    expect(within(slots()[0]).getByText('Portada')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hacer portada c.jpg' }))
+    expect(within(slots()[0]).getByText('Portada')).toBeInTheDocument()
+    expect(within(slots()[0]).getByRole('button', { name: 'Quitar c.jpg' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mover c.jpg después' }))
+    expect(within(slots()[1]).getByRole('button', { name: 'Quitar c.jpg' })).toBeInTheDocument()
+  })
+
+  it('desactiva una experiencia con confirmación y permite reactivarla', () => {
+    setRoleSession('OPERADOR')
+    renderAt('/operador/experiencias')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Desactivar Atardecer y surf en El Tunco' }))
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText('¿Desactivar esta experiencia?')).toBeInTheDocument()
+
+    // Cancelar no cambia nada.
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Desactivar Atardecer y surf en El Tunco' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Desactivar' }))
+
+    expect(screen.getByRole('status')).toHaveTextContent('«Atardecer y surf en El Tunco» quedó desactivada.')
+    expect(readSaved('experiences').find((item) => item.id === 1)).toMatchObject({
+      status: 'Desactivada',
+      previousStatus: 'Publicada',
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reactivar Atardecer y surf en El Tunco' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Reactivar' }))
+    expect(readSaved('experiences').find((item) => item.id === 1).status).toBe('Publicada')
+  })
+
+  it('valida y guarda la configuración del negocio', async () => {
+    setRoleSession('OPERADOR')
+    renderAt('/operador/configuracion')
+
+    fireEvent.change(screen.getByLabelText('Departamento'), { target: { value: 'Santa Ana' } })
+    expect(screen.getByLabelText('Municipio')).toHaveValue('')
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+    expect(await screen.findByText('Elige el municipio.')).toBeInTheDocument()
+    expect(readSaved('profile')).toBeNull()
+
+    fireEvent.change(screen.getByLabelText('Municipio'), { target: { value: 'Coatepeque' } })
+    fireEvent.change(screen.getByLabelText('Correo del negocio'), { target: { value: 'no-es-correo' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+    expect(await screen.findByText('Escribe un correo válido.')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Correo del negocio'), { target: { value: 'hola@volcan.com' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+    expect(await screen.findByText('Cambios guardados en este navegador.')).toBeInTheDocument()
+    expect(readSaved('profile')).toMatchObject({
+      department: 'Santa Ana',
+      municipality: 'Coatepeque',
+      email: 'hola@volcan.com',
+    })
+  })
+
+  it('rechaza un logo que no es JPG o PNG', () => {
+    setRoleSession('OPERADOR')
+    renderAt('/operador/configuracion')
+
+    fireEvent.change(screen.getByLabelText(/Agregar logo|Reemplazar logo/), {
+      target: { files: [new File(['x'], 'logo.gif', { type: 'image/gif' })] },
+    })
+    expect(screen.getByRole('alert')).toHaveTextContent('no es JPG ni PNG')
+  })
+
+  it('modifica una reserva validando viajeros y recalculando el total', () => {
+    setRoleSession('OPERADOR')
+    renderAt('/operador/reservas')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Modificar reserva RS-2047' }))
+    const dialog = screen.getByRole('dialog')
+    fireEvent.change(within(dialog).getByLabelText('Viajeros'), { target: { value: '0' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Guardar cambios' }))
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('al menos 1 viajero')
+
+    fireEvent.change(within(dialog).getByLabelText('Viajeros'), { target: { value: '3' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Guardar cambios' }))
+    expect(screen.getByRole('status')).toHaveTextContent('Reserva RS-2047 modificada')
+    expect(readSaved('reservations').find((item) => item.id === 'RS-2047')).toMatchObject({ guests: 3, total: 84 })
+  })
+
+  it('cancela una reserva con motivo, calcula el reembolso y permite marcarlo como realizado', () => {
+    setRoleSession('OPERADOR')
+    renderAt('/operador/reservas')
+
+    // RS-2048 empieza en unas 30 h: reembolso del 50 % de 70 USD.
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar reserva RS-2048' }))
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText(/Reembolso del 50 %/)).toHaveTextContent('$35')
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancelar reserva' }))
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('Elige el motivo')
+
+    fireEvent.change(within(dialog).getByLabelText('Motivo'), { target: { value: 'El viajero lo pidió' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancelar reserva' }))
+
+    expect(screen.getByRole('status')).toHaveTextContent('Reserva RS-2048 cancelada')
+    expect(readSaved('reservations').find((item) => item.id === 'RS-2048')).toMatchObject({
+      status: 'Cancelada',
+      cancelReason: 'El viajero lo pidió',
+    })
+    expect(readSaved('refunds')).toEqual([
+      expect.objectContaining({ reservationId: 'RS-2048', percent: 50, amount: 35, status: 'En proceso' }),
+    ])
+
+    fireEvent.click(screen.getByRole('link', { name: /Ver ticket de reembolso REF-\d{4}-000001/ }))
+    expect(screen.getByRole('heading', { name: /REF-\d{4}-000001/ })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Marcar como realizado' }))
+    expect(screen.getByRole('status')).toHaveTextContent('ya fue marcado como realizado')
+    expect(readSaved('refunds')[0].status).toBe('Realizado')
+  })
+
+  it('no ofrece reembolso si faltan menos de 24 h', () => {
+    setRoleSession('OPERADOR')
+    renderAt('/operador/reservas')
+
+    // RS-2046 empieza en unas 5 h.
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar reserva RS-2046' }))
+    expect(within(screen.getByRole('dialog')).getByText(/no genera reembolso/)).toBeInTheDocument()
+  })
+
+  it('cancela una sesión con motivo y deja pendientes de decisión las reservas afectadas', () => {
+    setRoleSession('OPERADOR')
+    const start = new Date(2026, 10, 21, 15, 0).toISOString()
+    localStorage.setItem(
+      'rutasv:operator:3f2504e0-4f89-11d3-9a0c-0305e82c3301:reservations',
+      JSON.stringify([
+        { id: 'RS-1', guest: 'Ana Prueba', experience: 'Atardecer y surf en El Tunco', experienceId: 1, date: '', startsAt: start, guests: 2, status: 'Confirmada' },
+      ]),
+    )
+    renderAt('/operador/cupos')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar sesión de las 15:00' }))
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText(/Ana Prueba/)).toBeInTheDocument()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancelar sesión' }))
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('El motivo es obligatorio')
+
+    fireEvent.change(within(dialog).getByLabelText('Motivo'), { target: { value: 'Mar picado' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancelar sesión' }))
+
+    expect(screen.getByRole('status')).toHaveTextContent('1 reserva quedó pendiente de decisión')
+    expect(readSaved('availability').find((item) => item.id === 'availability-3')).toMatchObject({ closed: true, available: 0 })
+    expect(readSaved('reservations')[0]).toMatchObject({ status: 'Pendiente de decisión', cancelReason: 'Mar picado' })
+  })
+
+  it('avisa al operador con el correo sin verificar', () => {
+    const token = createMockJwt({
+      sub: '3f2504e0-4f89-11d3-9a0c-0305e82c3301',
+      email: 'operador@rutasv.com',
+      'http://schemas.microsoft.com/ws/2008/06/identity/claims/role': 'OPERADOR',
+      email_verified: 'false',
+      exp: 4102444800,
+    })
+    localStorage.setItem('token', token)
+    renderAt('/operador')
+    expect(screen.getByText('Verifica tu correo para recibir avisos.')).toBeInTheDocument()
+  })
+
+  it('el admin lista las experiencias, las retira con motivo y las restaura', () => {
+    setRoleSession('ADMIN')
+    renderAt('/admin/experiencias')
+
+    expect(screen.getByRole('heading', { name: 'Experiencias' })).toBeInTheDocument()
+    // Lista el catálogo público, no datos genéricos del operador.
+    expect(screen.getByText('Surf al atardecer en El Tunco')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Filtrar por estado'), { target: { value: 'Borrador' } })
+    expect(screen.queryByText('Surf al atardecer en El Tunco')).not.toBeInTheDocument()
+    expect(screen.getByText('Ninguna experiencia coincide con tu búsqueda')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Filtrar por estado'), { target: { value: 'todos' } })
+
+    fireEvent.click(screen.getByRole('link', { name: /Del cafetal a tu taza en Apaneca/ }))
+    expect(screen.getByRole('heading', { name: 'Del cafetal a tu taza en Apaneca' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retirar experiencia' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirmar' }))
+    expect(within(screen.getByRole('dialog')).getByRole('alert')).toHaveTextContent('El motivo es obligatorio')
+
+    fireEvent.change(within(screen.getByRole('dialog')).getByLabelText('Motivo'), { target: { value: 'Fotos engañosas' } })
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirmar' }))
+    expect(screen.getByRole('status')).toHaveTextContent('Experiencia retirada')
+    expect(screen.getByRole('note')).toHaveTextContent('Fotos engañosas')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Restaurar experiencia' }))
+    fireEvent.change(within(screen.getByRole('dialog')).getByLabelText('Motivo'), { target: { value: 'Corrigió las fotos' } })
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirmar' }))
+    expect(screen.getByRole('status')).toHaveTextContent('restaurada')
+  })
+
+  it('el admin elimina una foto exigiendo el motivo', () => {
+    setRoleSession('ADMIN')
+    renderAt('/admin/experiencias/catalogo/surf-atardecer-el-tunco')
+
+    expect(screen.getByRole('heading', { name: 'Galería (5)' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar foto 2' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirmar' }))
+    expect(within(screen.getByRole('dialog')).getByRole('alert')).toHaveTextContent('El motivo es obligatorio')
+    fireEvent.change(within(screen.getByRole('dialog')).getByLabelText('Motivo'), { target: { value: 'Contenido ajeno' } })
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirmar' }))
+    expect(screen.getByRole('heading', { name: 'Galería (4)' })).toBeInTheDocument()
+  })
+
+  it('no crea la misma experiencia varias veces al volver a enviar', () => {
+    setRoleSession('OPERADOR')
+    renderAt('/operador/experiencias/nueva')
+
+    fireEvent.change(screen.getByLabelText('Nombre de la experiencia'), { target: { value: 'Solo una vez' } })
+    const draft = screen.getByRole('button', { name: 'Guardar borrador' })
+    fireEvent.click(draft)
+    fireEvent.click(draft)
+
+    expect(readSaved('experiences').filter((item) => item.title === 'Solo una vez')).toHaveLength(1)
+  })
+
+  it('rechaza archivos que no son JPG o PNG', () => {
+    setRoleSession('OPERADOR')
+    renderAt('/operador/experiencias/nueva')
+
+    fireEvent.change(screen.getByLabelText(/Agregar imágenes/), {
+      target: { files: [new File(['x'], 'documento.pdf', { type: 'application/pdf' })] },
+    })
+
+    expect(screen.getByRole('alert')).toHaveTextContent('no es JPG ni PNG')
   })
 
   it('carga y guarda los cambios al editar una experiencia', () => {
@@ -182,15 +487,16 @@ describe('App', () => {
     renderAt('/operador/experiencias/nueva?editar=1')
 
     expect(screen.getByRole('heading', { name: 'Editar experiencia' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Departamento')).toHaveValue('La Libertad')
     fireEvent.change(screen.getByLabelText('Nombre de la experiencia'), {
       target: { value: 'Surf al atardecer' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar borrador' }))
 
     expect(readSaved('experiences').find((item) => item.id === 1).title).toBe(
       'Surf al atardecer',
     )
-    expect(screen.getByRole('status')).toHaveTextContent('Cambios guardados')
+    expect(screen.getByRole('status')).toHaveTextContent('Cambios guardados en «Surf al atardecer».')
   })
 
   it('muestra cupos y filtra reservas por estado', () => {
@@ -202,9 +508,38 @@ describe('App', () => {
     unmount()
     renderAt('/operador/reservas')
     expect(screen.getByRole('heading', { name: 'Historial de Reservas' })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Pendiente' }))
+    fireEvent.change(screen.getByLabelText('Filtrar reservas por estado'), { target: { value: 'Pendiente' } })
     expect(screen.getByText('Daniel Rivera')).toBeInTheDocument()
     expect(screen.queryByText('María López')).not.toBeInTheDocument()
+  })
+
+  it('muestra el calendario de cupos con el detalle del día seleccionado', () => {
+    setRoleSession('OPERADOR')
+    renderAt('/operador/cupos')
+
+    const calendar = screen.getByRole('region', { name: 'Calendario de disponibilidad' })
+    expect(within(calendar).getByRole('heading', { name: /noviembre de 2026/i })).toBeInTheDocument()
+    expect(within(calendar).getByRole('button', { name: '14 de noviembre, 6 de 8 cupos' })).toBeInTheDocument()
+    expect(within(calendar).getByRole('button', { name: '2 de noviembre, sin sesiones' })).toBeInTheDocument()
+
+    fireEvent.click(within(calendar).getByRole('button', { name: '21 de noviembre, 4 de 8 cupos' }))
+    const detail = screen.getByRole('region', { name: 'Fecha seleccionada' })
+    expect(within(detail).getByText(/sábado, 21 de noviembre de 2026/i)).toBeInTheDocument()
+    expect(within(detail).getByText('4 de 8 espacios disponibles')).toBeInTheDocument()
+
+    fireEvent.click(within(detail).getByRole('button', { name: 'Editar cupos' }))
+    expect(screen.getByLabelText('Cupos disponibles')).toHaveValue(4)
+
+    fireEvent.click(within(calendar).getByRole('button', { name: 'Siguiente ›' }))
+    expect(within(calendar).getByRole('heading', { name: /diciembre de 2026/i })).toBeInTheDocument()
+  })
+
+  it('el resumen del operador muestra el calendario de disponibilidad', () => {
+    setRoleSession('OPERADOR')
+    renderAt('/operador')
+
+    expect(screen.getByRole('region', { name: 'Calendario de disponibilidad' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /editar cupos/i })).toHaveAttribute('href', '/operador/cupos')
   })
 
   it('permite añadir una fecha, hora y cupos disponibles', () => {

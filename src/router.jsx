@@ -1,10 +1,15 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import AdminLayout from './layouts/AdminLayout.jsx'
+import AuthLayout from './layouts/AuthLayout.jsx'
 import MainLayout from './layouts/MainLayout.jsx'
+import TuristaLayout from './layouts/TuristaLayout.jsx'
 import { Roles } from './lib/roles.js'
 import AdminDashboard from './pages/Admin/AdminDashboard.jsx'
+import AdminExperienceDetail from './pages/Admin/AdminExperienceDetail.jsx'
+import AdminExperiences from './pages/Admin/AdminExperiences.jsx'
 import CreateUser from './pages/Admin/CreateUser.jsx'
+import OperatorsList from './pages/Admin/OperatorsList.jsx'
 import RequestDetail from './pages/Admin/RequestDetail.jsx'
 import RequestsQueue from './pages/Admin/RequestsQueue.jsx'
 import UsersList from './pages/Admin/UsersList.jsx'
@@ -22,10 +27,19 @@ import OperatorExperiences from './pages/Operators/OperatorExperiences.jsx'
 import OperatorLayout from './pages/Operators/OperatorLayout.jsx'
 import MyOperatorRequest from './pages/Operators/MyOperatorRequest.jsx'
 import OperatorRequestForm from './pages/Operators/OperatorRequestForm.jsx'
+import OperatorRefundTicket from './pages/Operators/OperatorRefundTicket.jsx'
 import OperatorReservations from './pages/Operators/OperatorReservations.jsx'
 import OperatorReviews from './pages/Operators/OperatorReviews.jsx'
 import OperatorSettings from './pages/Operators/OperatorSettings.jsx'
 import Profile from './pages/Profile/Profile.jsx'
+import ActivityFavorites from './pages/Tourist/ActivityFavorites.jsx'
+import ActivityReservations from './pages/Tourist/ActivityReservations.jsx'
+import CompanyProfile from './pages/Companies/CompanyProfile.jsx'
+import ExperienceDetail from './pages/Experiences/ExperienceDetail.jsx'
+import ExperienceExplorer from './pages/Experiences/ExperienceExplorer.jsx'
+import Explorer from './pages/Tourist/Explorer.jsx'
+import Reservation from './pages/Tourist/Reservation.jsx'
+import ReservationConfirmation from './pages/Tourist/ReservationConfirmation.jsx'
 
 function AppRoutes() {
   return (
@@ -42,6 +56,7 @@ function AppRoutes() {
             element={<Navigate to="/operador/cupos" replace />}
           />
           <Route path="reservas" element={<OperatorReservations />} />
+          <Route path="reservas/reembolso/:refundId" element={<OperatorRefundTicket />} />
           <Route path="resenas" element={<OperatorReviews />} />
           <Route path="configuracion" element={<OperatorSettings />} />
         </Route>
@@ -54,6 +69,9 @@ function AppRoutes() {
           <Route path="usuarios" element={<UsersList />} />
           <Route path="usuarios/nuevo" element={<CreateUser />} />
           <Route path="solicitudes" element={<RequestsQueue />} />
+          <Route path="operadores" element={<OperatorsList />} />
+          <Route path="experiencias" element={<AdminExperiences />} />
+          <Route path="experiencias/:owner/:id" element={<AdminExperienceDetail />} />
           <Route
             path="solicitudes-operador"
             element={<Navigate to="/admin/solicitudes" replace />}
@@ -62,16 +80,29 @@ function AppRoutes() {
         </Route>
       </Route>
 
-      {/* Rutas públicas y de visitante autenticado bajo MainLayout */}
-      <Route element={<MainLayout />}>
-        <Route path="/" element={<Home />} />
+      {/* Vistas de turista: explorar es público; reservar y Mi actividad requieren sesión */}
+      <Route path="/turista" element={<TuristaLayout />}>
+        <Route index element={<Navigate to="explorar" replace />} />
+        <Route path="explorar" element={<Explorer />} />
+        <Route element={<ProtectedRoute />}>
+          <Route path="reservar" element={<Reservation />} />
+          <Route
+            path="reservar/confirmacion"
+            element={<ReservationConfirmation />}
+          />
+          <Route
+            path="mi-actividad"
+            element={<Navigate to="reservas" replace />}
+          />
+          <Route path="mi-actividad/reservas" element={<ActivityReservations />} />
+          <Route path="mi-actividad/favoritos" element={<ActivityFavorites />} />
+        </Route>
+      </Route>
+
+      {/* Acceso: carrusel con el logotipo y el formulario a la par */}
+      <Route element={<AuthLayout />}>
         <Route path="/login" element={<Login />} />
-        <Route path="/auth/login" element={<Navigate to="/login" replace />} />
         <Route path="/registro" element={<Registration />} />
-        <Route
-          path="/auth/register"
-          element={<Navigate to="/registro" replace />}
-        />
         <Route path="/verify-email" element={<EmailVerification />} />
         <Route path="/registro/verificar" element={<EmailVerification />} />
         <Route
@@ -81,6 +112,19 @@ function AppRoutes() {
         <Route
           path="/registro/verificacion/rechazada"
           element={<VerificationResult accepted={false} />}
+        />
+      </Route>
+
+      {/* Rutas públicas y de visitante autenticado bajo MainLayout */}
+      <Route element={<MainLayout />}>
+        <Route path="/" element={<Home />} />
+        <Route path="/experiencias" element={<ExperienceExplorer />} />
+        <Route path="/experiencias/:slug" element={<ExperienceDetail />} />
+        <Route path="/empresas/:slug" element={<CompanyProfile />} />
+        <Route path="/auth/login" element={<Navigate to="/login" replace />} />
+        <Route
+          path="/auth/register"
+          element={<Navigate to="/registro" replace />}
         />
 
         {/* Estado y detalle de solicitud de operador */}

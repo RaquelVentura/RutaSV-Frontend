@@ -32,7 +32,7 @@ const itemClass = 'text-sm text-white/75'
 function Footer() {
   return (
     <footer className="bg-ink text-white">
-      <div className="mx-auto max-w-6xl px-6 py-12">
+      <div className="w-full px-6 py-12">
         <div className="grid gap-10 md:grid-cols-4">
           <div>
             <p className="text-2xl font-extrabold">RutaSV</p>

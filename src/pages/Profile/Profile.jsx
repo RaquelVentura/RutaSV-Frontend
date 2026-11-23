@@ -95,7 +95,7 @@ function Profile() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="w-full space-y-6 px-6 pt-6">
       <header>
         <p className="text-xs text-muted">Inicio / Mi perfil</p>
         <p className="mt-2 text-xs font-bold uppercase tracking-wide text-brand">

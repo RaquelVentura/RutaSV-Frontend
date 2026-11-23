@@ -1,6 +1,8 @@
 //PANEL DE CUPOS DE EXPERIENCIAS
 
 import { useMemo, useState } from 'react'
+import Dialog from '../../components/admin/Dialog.jsx'
+import CuposCalendar from '../../components/operator/CuposCalendar.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 import {
   readOperatorCollection,
@@ -10,7 +12,7 @@ import {
 const fieldClass =
   'min-h-12 w-full rounded-xl border border-black/15 bg-white px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/15'
 
-function AvailabilityForm({ item, experiences, onCancel, onSave }) {
+function AvailabilityForm({ item, experiences, defaultDate = '', onCancel, onSave }) {
   function handleSubmit(event) {
     event.preventDefault()
     const formData = new FormData(event.currentTarget)
@@ -49,7 +51,7 @@ function AvailabilityForm({ item, experiences, onCancel, onSave }) {
       </div>
       <div className="grid gap-2">
         <label htmlFor="availability-form-date" className="text-sm font-semibold text-ink">Día</label>
-        <input id="availability-form-date" name="date" type="date" required defaultValue={item?.date ?? ''} className={fieldClass} />
+        <input id="availability-form-date" name="date" type="date" required defaultValue={item?.date ?? defaultDate} className={fieldClass} />
       </div>
       <div className="grid gap-2">
         <label htmlFor="availability-form-time" className="text-sm font-semibold text-ink">Hora</label>
@@ -77,6 +79,26 @@ function AvailabilityForm({ item, experiences, onCancel, onSave }) {
   )
 }
 
+const longDateFormatter = new Intl.DateTimeFormat('es-SV', {
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+})
+
+// Día que se muestra al abrir: la próxima sesión o, si no hay, la última cargada.
+function pickInitialDate(rows) {
+  if (rows.length === 0) return ''
+  const sorted = [...rows].map((row) => row.date).sort()
+  const today = new Date().toISOString().slice(0, 10)
+  return sorted.find((date) => date >= today) ?? sorted[sorted.length - 1]
+}
+
+function monthOf(isoDate) {
+  const base = isoDate ? new Date(`${isoDate}T00:00:00`) : new Date()
+  return { year: base.getFullYear(), month: base.getMonth() }
+}
+
 function OperatorAvailability() {
   const { user } = useAuth()
   const { experiences, initialRows } = useMemo(
@@ -91,11 +113,17 @@ function OperatorAvailability() {
   const [editingId, setEditingId] = useState(null)
   const [adding, setAdding] = useState(false)
   const [notice, setNotice] = useState(null)
+  const [cancelling, setCancelling] = useState(null)
+  const [cancelReason, setCancelReason] = useState('')
+  const [cancelError, setCancelError] = useState('')
+  const [selectedDate, setSelectedDate] = useState(() => pickInitialDate(initialRows))
   const experienceById = new Map(experiences.map((experience) => [String(experience.id), experience]))
   const filteredRows = rows.filter((item) => {
     if (selectedExperience === 'Todas') return true
     return String(item.experienceId) === selectedExperience
   })
+
+  const dayRows = filteredRows.filter((item) => item.date === selectedDate)
 
   function persist(updatedRows) {
     saveOperatorCollection(user, 'availability', updatedRows)
@@ -104,6 +132,63 @@ function OperatorAvailability() {
       type: 'success',
       text: 'Disponibilidad guardada en este navegador; estos datos quedan listos para conectarse al backend.',
     })
+  }
+
+  // Reservas activas que caen en una sesión (misma experiencia, día y hora).
+  function reservationsOfSession(session) {
+    return readOperatorCollection(user, 'reservations').filter((reservation) => {
+      if (String(reservation.experienceId) !== String(session.experienceId)) return false
+      if (reservation.status !== 'Pendiente' && reservation.status !== 'Confirmada') return false
+      if (!reservation.startsAt) return false
+      const start = new Date(reservation.startsAt)
+      const pad = (value) => String(value).padStart(2, '0')
+      return (
+        `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}` === session.date &&
+        `${pad(start.getHours())}:${pad(start.getMinutes())}` === session.time
+      )
+    })
+  }
+
+  function openCancel(session) {
+    setCancelling({ session, affected: reservationsOfSession(session) })
+    setCancelReason('')
+    setCancelError('')
+  }
+
+  function confirmCancelSession(event) {
+    event.preventDefault()
+    const motive = cancelReason.trim()
+    if (!motive) {
+      setCancelError('El motivo es obligatorio.')
+      return
+    }
+    const { session, affected } = cancelling
+    try {
+      const updatedRows = rows.map((item) =>
+        item.id === session.id ? { ...item, available: 0, closed: true, closedReason: motive } : item,
+      )
+      saveOperatorCollection(user, 'availability', updatedRows)
+      if (affected.length > 0) {
+        const ids = new Set(affected.map((reservation) => reservation.id))
+        const updatedReservations = readOperatorCollection(user, 'reservations').map((reservation) =>
+          ids.has(reservation.id)
+            ? { ...reservation, status: 'Pendiente de decisión', cancelReason: motive }
+            : reservation,
+        )
+        saveOperatorCollection(user, 'reservations', updatedReservations)
+      }
+      setRows(updatedRows)
+      setNotice({
+        type: 'success',
+        text:
+          affected.length > 0
+            ? `Sesión cancelada. ${affected.length} ${affected.length === 1 ? 'reserva quedó' : 'reservas quedaron'} pendiente de decisión del viajero (reagendar o reembolso).`
+            : 'Sesión cancelada. No tenía reservas.',
+      })
+    } catch (error) {
+      setNotice({ type: 'error', text: `No se pudo cancelar la sesión: ${error.message}` })
+    }
+    setCancelling(null)
   }
 
   function handleSave(values, validationError) {
@@ -173,6 +258,7 @@ function OperatorAvailability() {
       {adding && experiences.length > 0 && (
         <AvailabilityForm
           experiences={experiences}
+          defaultDate={selectedDate}
           onCancel={() => setAdding(false)}
           onSave={handleSave}
         />
@@ -196,56 +282,89 @@ function OperatorAvailability() {
         </p>
       )}
 
-      <section className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
-        {filteredRows.map((item) => {
-          const experience = experienceById.get(String(item.experienceId))
-          const date = new Date(`${item.date}T00:00:00`)
-          const formattedDate = Number.isNaN(date.getTime())
-            ? item.date
-            : new Intl.DateTimeFormat('es-SV', {
-                weekday: 'long',
-                day: 'numeric',
-                month: 'long',
-              }).format(date)
+      <CuposCalendar
+        rows={filteredRows}
+        selectedDate={selectedDate}
+        onSelect={(date) => {
+          setSelectedDate(date)
+          setEditingId(null)
+        }}
+        initialMonth={monthOf(selectedDate)}
+      />
 
-          return (
-            <article key={item.id} className="flex min-h-44 flex-col justify-between rounded-2xl border border-black/10 bg-white p-5 shadow-sm lg:p-6">
-              <div>
-                <p className="text-base font-bold capitalize text-ink">{formattedDate} · {item.time}</p>
-                <p className="mt-2 text-sm text-muted">{experience?.title ?? 'Experiencia no disponible'}</p>
-              </div>
-              <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-black/10 pt-4">
-                <span className="text-sm font-semibold text-brand">
-                  {item.available} de {item.capacity} espacios disponibles
-                </span>
-                <button
-                  type="button"
-                  aria-expanded={editingId === item.id}
-                  onClick={() => {
-                    setEditingId((current) => current === item.id ? null : item.id)
-                    setAdding(false)
-                    setNotice(null)
-                  }}
-                  className="text-sm font-semibold text-brand hover:underline"
-                >
-                  {editingId === item.id ? 'Cerrar edición' : 'Editar cupos'}
-                </button>
-              </div>
-              {editingId === item.id && (
-                <div className="mt-5 border-t border-black/10 pt-5">
-                  <AvailabilityForm
-                    item={item}
-                    experiences={experiences}
-                    onCancel={() => setEditingId(null)}
-                    onSave={handleSave}
-                  />
+      <section aria-label="Fecha seleccionada" className="rounded-2xl bg-info-soft p-5 lg:p-7">
+        {selectedDate ? (
+          <>
+            <h2 className="text-lg font-bold capitalize text-ink">
+              {longDateFormatter.format(new Date(`${selectedDate}T00:00:00`))}
+            </h2>
+            <p className="mt-1 text-sm text-muted">
+              {dayRows.length === 0
+                ? 'No hay sesiones este día.'
+                : `${dayRows.length} ${dayRows.length === 1 ? 'sesión' : 'sesiones'} con cupos cargados.`}
+            </p>
+          </>
+        ) : (
+          <p className="text-sm text-muted">Selecciona un día del calendario para ver sus sesiones.</p>
+        )}
+
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          {dayRows.map((item) => {
+            const experience = experienceById.get(String(item.experienceId))
+            return (
+              <article key={item.id} className="flex flex-col justify-between rounded-2xl border border-black/10 bg-white p-5 shadow-sm">
+                <div>
+                  <p className="text-base font-bold text-ink">{item.time} · {experience?.title ?? 'Experiencia no disponible'}</p>
                 </div>
-              )}
-            </article>
-          )
-        })}
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-black/10 pt-4">
+                  {item.closed ? (
+                    <span className="text-sm font-semibold text-danger">Sesión cancelada</span>
+                  ) : (
+                    <span className="text-sm font-semibold text-brand">
+                      {item.available} de {item.capacity} espacios disponibles
+                    </span>
+                  )}
+                  {!item.closed && (
+                    <button
+                      type="button"
+                      onClick={() => openCancel(item)}
+                      aria-label={`Cancelar sesión de las ${item.time}`}
+                      className="rounded-full border border-black/15 px-4 py-2 text-sm font-semibold text-danger transition hover:bg-danger-soft"
+                    >
+                      Cancelar sesión
+                    </button>
+                  )}
+                  {!item.closed && (
+                  <button
+                    type="button"
+                    aria-expanded={editingId === item.id}
+                    onClick={() => {
+                      setEditingId((current) => current === item.id ? null : item.id)
+                      setAdding(false)
+                      setNotice(null)
+                    }}
+                    className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark"
+                  >
+                    {editingId === item.id ? 'Cerrar edición' : 'Editar cupos'}
+                  </button>
+                  )}
+                </div>
+                {editingId === item.id && (
+                  <div className="mt-5 border-t border-black/10 pt-5">
+                    <AvailabilityForm
+                      item={item}
+                      experiences={experiences}
+                      onCancel={() => setEditingId(null)}
+                      onSave={handleSave}
+                    />
+                  </div>
+                )}
+              </article>
+            )
+          })}
+        </div>
         {!filteredRows.length && (
-          <p className="rounded-2xl border border-dashed border-black/20 bg-white px-4 py-12 text-center text-sm text-muted md:col-span-2 2xl:col-span-3">
+          <p className="mt-4 rounded-2xl border border-dashed border-black/20 bg-white px-4 py-8 text-center text-sm text-muted">
             No hay fechas disponibles para esta experiencia.
           </p>
         )}
@@ -253,6 +372,54 @@ function OperatorAvailability() {
       <p className="text-xs leading-5 text-muted">
         Disponibilidad de ejemplo guardada en este navegador y aislada por perfil.
       </p>
+
+      {cancelling && (
+        <Dialog title="Cancelar sesión" onClose={() => setCancelling(null)}>
+          <form onSubmit={confirmCancelSession} noValidate className="mt-4 grid gap-4">
+            <p className="text-sm text-muted">
+              {cancelling.session.date} · {cancelling.session.time}. Se cierra la disponibilidad y se avisa a los viajeros afectados.
+            </p>
+            <div>
+              <p className="text-sm font-semibold text-ink">Reservas afectadas ({cancelling.affected.length})</p>
+              {cancelling.affected.length === 0 ? (
+                <p className="mt-1 text-sm text-muted">Ninguna reserva activa en esta sesión.</p>
+              ) : (
+                <ul className="mt-2 grid gap-1.5 text-sm text-ink">
+                  {cancelling.affected.map((reservation) => (
+                    <li key={reservation.id} className="rounded-lg bg-canvas px-3 py-2">
+                      {reservation.guest} · {reservation.guests} {reservation.guests === 1 ? 'viajero' : 'viajeros'} · {reservation.id}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {cancelling.affected.length > 0 && (
+                <p className="mt-2 text-xs text-muted">
+                  Cada viajero tendrá 1 mes para reagendar (mismo precio) o pedir el reembolso completo.
+                </p>
+              )}
+            </div>
+            <label className="grid gap-1.5 text-sm font-semibold text-ink" htmlFor="cancel-session-reason">
+              Motivo
+              <textarea
+                id="cancel-session-reason"
+                rows="3"
+                value={cancelReason}
+                onChange={(event) => { setCancelReason(event.target.value); setCancelError('') }}
+                className="w-full rounded-xl border border-black/15 bg-white px-3 py-3 text-sm font-normal text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/15"
+              />
+            </label>
+            {cancelError && <p role="alert" className="text-sm font-semibold text-danger">{cancelError}</p>}
+            <div className="flex justify-end gap-3">
+              <button type="button" onClick={() => setCancelling(null)} className="rounded-xl border border-black/15 px-5 py-2.5 text-sm font-semibold text-ink hover:bg-canvas">
+                Volver
+              </button>
+              <button type="submit" className="rounded-xl bg-danger px-5 py-2.5 text-sm font-bold text-white hover:opacity-90">
+                Cancelar sesión
+              </button>
+            </div>
+          </form>
+        </Dialog>
+      )}
     </div>
   )
 }

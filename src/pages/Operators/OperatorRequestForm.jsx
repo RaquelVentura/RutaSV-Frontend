@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext.jsx'
 import {
   createOperatorRequest,
@@ -74,25 +74,6 @@ function mapExistingDocToFileState(doc, fallbackName) {
     url: doc.url || null,
     rawFile: null,
   }
-}
-
-function getDisplayName(user) {
-  return (
-    user?.name ||
-    [user?.given_name, user?.family_name].filter(Boolean).join(' ') ||
-    user?.email ||
-    'Mi perfil'
-  )
-}
-
-function getInitials(name) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join('')
-    .toUpperCase()
 }
 
 function validateImage(file) {
@@ -307,8 +288,6 @@ export default function OperatorRequestForm() {
   const shellRef = useRef(null)
   const objectUrls = useRef(new Set())
 
-  const displayName = getDisplayName(user)
-  const initials = getInitials(displayName)
 
   function applyExistingRequestToForm(req) {
     if (!req) return
@@ -715,47 +694,35 @@ export default function OperatorRequestForm() {
   }
 
   return (
-    <main className="min-h-screen bg-stone-50 px-4 py-8 sm:px-6 lg:px-8">
+    <div className="w-full px-6 pb-10 pt-6">
+      <header>
+        <p className="text-xs font-bold tracking-wider text-cyan-700">
+          PASO {step} DE 2 · {step === 1 ? 'DATOS DEL NEGOCIO' : 'DOCUMENTOS Y EVIDENCIAS'}
+        </p>
+        <h1 id="operator-request-title" className="mt-3 text-3xl font-extrabold text-stone-900">
+          {step === 1 ? 'Solicita ser operador' : 'Muéstranos lo que haces'}
+        </h1>
+        <p className="mt-2 text-sm text-stone-500">
+          {step === 1
+            ? 'Cuéntanos de tu negocio. Un administrador revisará tu solicitud.'
+            : 'Tus documentos son privados y solo los ve el equipo de RutaSV.'}
+        </p>
+      </header>
+
       <section
-        className="mx-auto max-w-xl rounded-3xl border border-stone-200 bg-white p-6 shadow-sm sm:p-10"
+        className="mt-6 w-full rounded-3xl border border-stone-200 bg-white p-6 shadow-sm sm:p-8 lg:p-10"
         aria-labelledby="operator-request-title"
         ref={shellRef}
       >
-        <header className="mb-8 flex items-center justify-between border-b border-stone-100 pb-5">
-          <Link className="text-xl font-bold tracking-tight text-[#087E9A] hover:opacity-90" to="/">
-            RutaSV
-          </Link>
-          <div className="flex items-center gap-2.5" aria-label={`Perfil de ${displayName}`}>
-            <span
-              aria-hidden="true"
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-cyan-100 text-xs font-bold text-[#087E9A]"
-            >
-              {initials}
-            </span>
-            <span className="text-sm font-medium text-stone-700">{displayName}</span>
-          </div>
-        </header>
-
         <form
-          className="flex flex-col gap-5"
+          className="flex flex-col gap-6"
           noValidate
           onSubmit={step === 1 ? handleNext : handleSubmit}
           ref={formRef}
         >
-          <p className="text-xs font-bold tracking-wider text-cyan-700">
-            PASO {step} DE 2 · {step === 1 ? 'DATOS DEL NEGOCIO' : 'DOCUMENTOS Y EVIDENCIAS'}
-          </p>
-          <h1 id="operator-request-title" className="text-2xl font-bold text-stone-900">
-            {step === 1 ? 'Solicita ser operador' : 'Muéstranos lo que haces'}
-          </h1>
-          <p className="text-sm text-stone-500">
-            {step === 1
-              ? 'Cuéntanos de tu negocio. Un administrador revisará tu solicitud.'
-              : 'Tus documentos son privados y solo los ve el equipo de RutaSV.'}
-          </p>
-
           {step === 1 ? (
             <>
+              <div className="grid gap-x-6 gap-y-5 md:grid-cols-2">
               <TextField
                 id="operator-business-name"
                 label="Nombre del negocio / guía"
@@ -831,7 +798,7 @@ export default function OperatorRequestForm() {
                 value={business.contactEmail}
                 error={errors.contactEmail}
               />
-              <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-1.5 md:col-span-2">
                 <label htmlFor="operator-description" className="text-sm font-semibold text-stone-700">
                   Describe tu negocio y lo que ofreces
                 </label>
@@ -852,7 +819,7 @@ export default function OperatorRequestForm() {
                 />
                 <ErrorMessage id="operator-description-error">{errors.description}</ErrorMessage>
               </div>
-              <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-1.5 md:col-span-2">
                 <label htmlFor="operator-message" className="text-sm font-semibold text-stone-700">
                   Mensaje para el administrador (opcional)
                 </label>
@@ -873,6 +840,7 @@ export default function OperatorRequestForm() {
                 />
                 <ErrorMessage id="operator-message-error">{errors.message}</ErrorMessage>
               </div>
+              </div>
               <label className="flex items-center gap-3 cursor-pointer py-1">
                 <input
                   checked={confirmed}
@@ -887,7 +855,7 @@ export default function OperatorRequestForm() {
               </label>
               <ErrorMessage id="operator-confirmed-error">{errors.confirmed}</ErrorMessage>
               <button
-                className="mt-2 w-full rounded-xl bg-[#087E9A] px-4 py-3 text-sm font-semibold text-white transition hover:bg-cyan-800 focus:outline-none"
+                className="self-end rounded-xl bg-[#087E9A] px-8 py-3 text-sm font-semibold text-white transition hover:bg-cyan-800 focus:outline-none"
                 type="submit"
               >
                 Siguiente
@@ -902,6 +870,7 @@ export default function OperatorRequestForm() {
             </>
           ) : (
             <>
+              <div className="grid gap-x-6 gap-y-5 md:grid-cols-2">
               <FileUpload
                 error={errors.identityPhoto}
                 file={identityPhoto}
@@ -958,6 +927,7 @@ export default function OperatorRequestForm() {
                 }
                 title="Constancia o registro de turismo"
               />
+              </div>
 
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center justify-between text-sm">
@@ -979,7 +949,7 @@ export default function OperatorRequestForm() {
                   onChange={handleEvidenceChange}
                   type="file"
                 />
-                <div className="mt-2 grid grid-cols-3 gap-3 sm:grid-cols-5">
+                <div className="mt-2 grid grid-cols-[repeat(auto-fill,minmax(7rem,9rem))] gap-3">
                   {evidencePhotos.map((file) => (
                     <div
                       className="group relative aspect-square overflow-hidden rounded-xl border border-stone-200"
@@ -1068,25 +1038,27 @@ export default function OperatorRequestForm() {
                   {createdRequest?.tradeName ? ` (${createdRequest.tradeName})` : ''}
                 </p>
               )}
-              <button
-                className="mt-2 w-full rounded-xl bg-[#087E9A] px-4 py-3 text-sm font-semibold text-white transition hover:bg-cyan-800 disabled:opacity-50 focus:outline-none"
-                disabled={isSubmitting || Boolean(createdRequest)}
-                type="submit"
-              >
-                {isSubmitting ? 'Enviando solicitud...' : 'Enviar solicitud'}
-              </button>
-              <button
-                className="w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-50 disabled:opacity-50 focus:outline-none"
-                disabled={isSubmitting}
-                onClick={handleBack}
-                type="button"
-              >
-                Atrás
-              </button>
+              <div className="flex flex-wrap justify-end gap-3">
+                <button
+                  className="rounded-xl border border-stone-300 bg-white px-6 py-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-50 disabled:opacity-50 focus:outline-none"
+                  disabled={isSubmitting}
+                  onClick={handleBack}
+                  type="button"
+                >
+                  Atrás
+                </button>
+                <button
+                  className="rounded-xl bg-[#087E9A] px-8 py-3 text-sm font-semibold text-white transition hover:bg-cyan-800 disabled:opacity-50 focus:outline-none"
+                  disabled={isSubmitting || Boolean(createdRequest)}
+                  type="submit"
+                >
+                  {isSubmitting ? 'Enviando solicitud...' : 'Enviar solicitud'}
+                </button>
+              </div>
             </>
           )}
         </form>
       </section>
-    </main>
+    </div>
   )
 }

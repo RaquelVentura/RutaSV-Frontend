@@ -117,12 +117,8 @@ export default function EmailVerification() {
   }
 
   return (
-    <section className="mx-auto max-w-md rounded-3xl border border-stone-200 bg-white p-6 shadow-sm sm:p-8">
-      <Link to="/" className="text-xl font-bold text-[#087E9A]">
-        RutaSV
-      </Link>
-
-      <div className="mt-8 text-center">
+    <section className="flex h-full flex-col justify-center">
+      <div className="text-center">
         <div
           aria-hidden="true"
           className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-cyan-50 text-2xl text-[#087E9A]"

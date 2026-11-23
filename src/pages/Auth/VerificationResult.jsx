@@ -9,7 +9,7 @@ export default function VerificationResult({ accepted }) {
     : 'El código no fue aceptado. Revisa el código e inténtalo de nuevo.'
 
   return (
-    <section className="mx-auto max-w-md rounded-3xl border border-stone-200 bg-white p-6 text-center shadow-sm sm:p-8">
+    <section className="flex h-full flex-col justify-center text-center">
       <div
         aria-hidden="true"
         className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full text-3xl font-bold ${

@@ -4,7 +4,6 @@ import { Link, NavLink, Outlet } from 'react-router-dom'
 import UserMenu from '../../components/UserMenu.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { getUserMenuItems, getUserMenuLabel } from '../../lib/userMenu.js'
-import { getOperatorDisplayName } from './operatorRepository.js'
 
 const navigation = [
   { to: '/operador', label: 'Resumen', end: true },
@@ -15,16 +14,18 @@ const navigation = [
   { to: '/operador/configuracion', label: 'Configuración' },
 ]
 
+// Enlaces del encabezado: sin forma de botón; el hover y el subrayado de la
+// sección activa los distinguen (igual que en el panel del admin).
 function NavigationLink({ item }) {
   return (
     <NavLink
       to={item.to}
       end={item.end}
       className={({ isActive }) =>
-        `rounded-lg px-2.5 py-3 text-center text-sm transition hover:bg-info-soft ${
+        `rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
           isActive
-            ? 'bg-info-soft font-bold text-brand'
-            : 'font-medium text-muted hover:text-brand'
+            ? 'text-brand underline decoration-2 underline-offset-8'
+            : 'text-ink hover:bg-canvas hover:text-brand'
         }`
       }
     >
@@ -35,37 +36,43 @@ function NavigationLink({ item }) {
 
 function OperatorLayout() {
   const { user, logout } = useAuth()
-  const operatorName = getOperatorDisplayName(user)
 
   return (
     <div className="min-h-screen w-full bg-canvas text-ink">
       <div className="min-h-screen w-full bg-canvas">
-        <header className="flex min-h-[76px] items-center justify-between gap-4 border-b border-black/10 bg-white px-5 md:px-8 lg:px-12 2xl:px-16">
-          <Link to="/" className="text-[28px] font-extrabold tracking-tight text-brand">
-            RutaSV
-          </Link>
-          <UserMenu
-            label={getUserMenuLabel(user)}
-            items={getUserMenuItems(user)}
-            onLogout={logout}
-            className="max-w-[65%] md:max-w-sm"
-          />
+        <header className="border-b border-black/10 bg-white">
+          <div className="flex w-full flex-wrap items-center gap-x-6 gap-y-2 px-5 py-3 md:px-8 lg:px-12 2xl:px-16">
+            <Link to="/" className="text-[28px] font-extrabold tracking-tight text-brand">
+              RutaSV
+            </Link>
+
+            <nav aria-label="Navegación del operador" className="flex flex-wrap items-center gap-1">
+              {navigation.map((item) => (
+                <NavigationLink key={item.to} item={item} />
+              ))}
+            </nav>
+
+            <div className="ml-auto">
+              <UserMenu
+                label={getUserMenuLabel(user)}
+                items={getUserMenuItems(user)}
+                onLogout={logout}
+                className="max-w-[65%] md:max-w-sm"
+              />
+            </div>
+          </div>
         </header>
 
-        <main className="px-5 pb-12 pt-8 md:px-8 md:pt-10 lg:px-12 lg:pt-12 2xl:px-16">
-          <p className="text-xs font-bold uppercase tracking-wide text-brand">
-            Panel del operador · {operatorName}
-          </p>
-          <nav
-            aria-label="Navegación del operador"
-            className="mt-5 grid grid-cols-2 gap-2 border-b border-black/10 pb-5 sm:grid-cols-3 lg:grid-cols-6 lg:gap-4"
-          >
-            {navigation.map((item) => (
-              <NavigationLink key={item.to} item={item} />
-            ))}
-          </nav>
+        {user && !user.emailVerified && (
+          <div role="status" className="border-b border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-900 md:px-8 lg:px-12 2xl:px-16">
+            <strong>Verifica tu correo para recibir avisos.</strong>{' '}
+            Mientras no lo verifiques no te enviaremos avisos de reservas, cancelaciones ni cambios.{' '}
+            <Link to="/verify-email" className="font-semibold underline">Verificar ahora</Link>
+          </div>
+        )}
 
-          <section className="pt-7 md:pt-9">
+        <main className="px-5 pb-12 pt-8 md:px-8 lg:px-12 2xl:px-16">
+          <section>
             <Outlet />
           </section>
         </main>
