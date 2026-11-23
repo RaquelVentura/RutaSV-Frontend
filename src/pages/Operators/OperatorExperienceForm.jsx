@@ -226,7 +226,10 @@ function OperatorExperienceForm() {
   }
 
   const checklist = useMemo(() => {
-    const insideSv = isInsideElSalvador(Number(form.latitude), Number(form.longitude))
+    const insideSv = isInsideElSalvador({
+      lat: Number(form.latitude),
+      lng: Number(form.longitude),
+    })
     const priceValid = form.price !== '' && Number(form.price) >= 0
     const minP = Number(form.minPeople || 0)
     const maxP = Number(form.maxPeople || 0)
