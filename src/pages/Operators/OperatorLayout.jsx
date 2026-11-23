@@ -63,6 +63,14 @@ function OperatorLayout() {
           </div>
         </header>
 
+        {user && !user.emailVerified && (
+          <div role="status" className="border-b border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-900 md:px-8 lg:px-12 2xl:px-16">
+            <strong>Verifica tu correo para recibir avisos.</strong>{' '}
+            Mientras no lo verifiques no te enviaremos avisos de reservas, cancelaciones ni cambios.{' '}
+            <Link to="/verify-email" className="font-semibold underline">Verificar ahora</Link>
+          </div>
+        )}
+
         <main className="px-5 pb-12 pt-8 md:px-8 lg:px-12 2xl:px-16">
           <section>
             <Outlet />

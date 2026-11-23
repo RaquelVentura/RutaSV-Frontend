@@ -97,6 +97,33 @@ describe('Detalle de la experiencia', () => {
     expect(booking.contactEmail).toBe('ana.lopez@correo.com')
   })
 
+  it('ampliar una foto abre el visor y se navega con las flechas', () => {
+    renderDetail()
+    fireEvent.click(screen.getByRole('button', { name: 'Ampliar foto 2' }))
+    const viewer = screen.getByRole('dialog', { name: /Foto 2 de/ })
+    expect(viewer).toBeInTheDocument()
+
+    fireEvent.click(within(viewer).getByRole('button', { name: 'Foto siguiente' }))
+    expect(screen.getByRole('dialog', { name: /Foto 3 de/ })).toBeInTheDocument()
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Foto anterior' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Ver foto 1' }))
+    expect(screen.getByRole('dialog', { name: /Foto 1 de/ })).toBeInTheDocument()
+
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Cerrar' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('desde la cuadrícula se amplía una foto y Volver regresa a la cuadrícula', () => {
+    renderDetail()
+    fireEvent.click(screen.getAllByRole('button', { name: /Ver las 8 fotos/ })[0])
+    fireEvent.click(screen.getByRole('button', { name: /Ampliar foto 3 de/ }))
+    expect(screen.getByRole('dialog', { name: /Foto 3 de/ })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Volver' }))
+    expect(screen.getByRole('dialog', { name: /Fotos de Surf al atardecer/ })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: /Foto 3 de/ })).not.toBeInTheDocument()
+  })
+
   it('abre y cierra todas las fotos', () => {
     renderDetail()
 

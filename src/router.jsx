@@ -6,6 +6,8 @@ import MainLayout from './layouts/MainLayout.jsx'
 import TuristaLayout from './layouts/TuristaLayout.jsx'
 import { Roles } from './lib/roles.js'
 import AdminDashboard from './pages/Admin/AdminDashboard.jsx'
+import AdminExperienceDetail from './pages/Admin/AdminExperienceDetail.jsx'
+import AdminExperiences from './pages/Admin/AdminExperiences.jsx'
 import CreateUser from './pages/Admin/CreateUser.jsx'
 import OperatorsList from './pages/Admin/OperatorsList.jsx'
 import RequestDetail from './pages/Admin/RequestDetail.jsx'
@@ -25,6 +27,7 @@ import OperatorExperiences from './pages/Operators/OperatorExperiences.jsx'
 import OperatorLayout from './pages/Operators/OperatorLayout.jsx'
 import MyOperatorRequest from './pages/Operators/MyOperatorRequest.jsx'
 import OperatorRequestForm from './pages/Operators/OperatorRequestForm.jsx'
+import OperatorRefundTicket from './pages/Operators/OperatorRefundTicket.jsx'
 import OperatorReservations from './pages/Operators/OperatorReservations.jsx'
 import OperatorReviews from './pages/Operators/OperatorReviews.jsx'
 import OperatorSettings from './pages/Operators/OperatorSettings.jsx'
@@ -53,6 +56,7 @@ function AppRoutes() {
             element={<Navigate to="/operador/cupos" replace />}
           />
           <Route path="reservas" element={<OperatorReservations />} />
+          <Route path="reservas/reembolso/:refundId" element={<OperatorRefundTicket />} />
           <Route path="resenas" element={<OperatorReviews />} />
           <Route path="configuracion" element={<OperatorSettings />} />
         </Route>
@@ -66,6 +70,8 @@ function AppRoutes() {
           <Route path="usuarios/nuevo" element={<CreateUser />} />
           <Route path="solicitudes" element={<RequestsQueue />} />
           <Route path="operadores" element={<OperatorsList />} />
+          <Route path="experiencias" element={<AdminExperiences />} />
+          <Route path="experiencias/:owner/:id" element={<AdminExperienceDetail />} />
           <Route
             path="solicitudes-operador"
             element={<Navigate to="/admin/solicitudes" replace />}

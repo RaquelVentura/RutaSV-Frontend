@@ -1,8 +1,10 @@
 //PANEL DE EXPERIENCIAS FORMULARIO
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import LeafletMap from '../../components/map/LeafletMap.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { departmentNames, municipalitiesByDepartment } from '../../data/geo.js'
+import { isInsideElSalvador } from '../../lib/geoBounds.js'
 import {
   readOperatorCollection,
   saveOperatorCollection,
@@ -42,6 +44,67 @@ function OperatorExperienceForm() {
   const savedPhotoCount = experience?.photoCount ?? 0
   const totalPhotos = savedPhotoCount + photos.length
   const municipalities = municipalitiesByDepartment[department] ?? []
+  const [position, setPosition] = useState(() =>
+    typeof experience?.lat === 'number' && typeof experience?.lng === 'number'
+      ? { lat: experience.lat, lng: experience.lng }
+      : null,
+  )
+  const [coordText, setCoordText] = useState(() => ({
+    lat: typeof experience?.lat === 'number' ? String(experience.lat) : '',
+    lng: typeof experience?.lng === 'number' ? String(experience.lng) : '',
+  }))
+  // Copia de los campos para el checklist «Completa para publicar».
+  const [snapshot, setSnapshot] = useState(() => ({
+    title: experience?.title ?? '',
+    category: experience?.category ?? '',
+    municipality: experience?.municipality ?? '',
+    price: String(experience?.price ?? ''),
+    capacity: String(experience?.capacity ?? ''),
+    description: experience?.description ?? '',
+  }))
+
+  function readSnapshot(form) {
+    const data = new FormData(form)
+    setSnapshot({
+      title: String(data.get('title') ?? ''),
+      category: String(data.get('category') ?? ''),
+      municipality: String(data.get('municipality') ?? ''),
+      price: String(data.get('price') ?? ''),
+      capacity: String(data.get('capacity') ?? ''),
+      description: String(data.get('description') ?? ''),
+    })
+  }
+
+  function pickPoint(point) {
+    setPosition(point)
+    setCoordText({ lat: point.lat.toFixed(5), lng: point.lng.toFixed(5) })
+    setNotice(null)
+  }
+
+  function typeCoordinate(axis, value) {
+    const next = { ...coordText, [axis]: value }
+    setCoordText(next)
+    const lat = Number(next.lat)
+    const lng = Number(next.lng)
+    if (next.lat.trim() && next.lng.trim() && Number.isFinite(lat) && Number.isFinite(lng)) {
+      setPosition({ lat, lng })
+    } else {
+      setPosition(null)
+    }
+  }
+
+  const locationOutside = position !== null && !isInsideElSalvador(position)
+  const checklist = [
+    { label: 'Nombre de la experiencia', done: snapshot.title.trim() !== '' },
+    { label: 'Categoría', done: snapshot.category !== '' },
+    { label: 'Departamento y municipio', done: department !== '' && snapshot.municipality !== '' },
+    { label: 'Precio mayor que 0', done: Number(snapshot.price) > 0 },
+    { label: 'Capacidad de al menos 1 persona', done: Number(snapshot.capacity) >= 1 },
+    { label: 'Descripción', done: snapshot.description.trim() !== '' },
+    { label: `Mínimo ${minPhotos} fotos`, done: totalPhotos >= minPhotos },
+    { label: 'Ubicación dentro de El Salvador', done: isInsideElSalvador(position) },
+  ]
+  const missing = checklist.filter((item) => !item.done)
 
   // Libera las vistas previas al salir o al cambiar de fotos.
   useEffect(
@@ -74,6 +137,21 @@ function OperatorExperienceForm() {
     setNotice(problems.length > 0 ? { type: 'error', text: problems.join(' ') } : null)
   }
 
+  // La primera foto es la portada: se puede mover o elegir otra como portada.
+  function movePhoto(index, direction) {
+    setPhotos((current) => {
+      const target = index + direction
+      if (target < 0 || target >= current.length) return current
+      const next = [...current]
+      ;[next[index], next[target]] = [next[target], next[index]]
+      return next
+    })
+  }
+
+  function makeCover(index) {
+    setPhotos((current) => [current[index], ...current.filter((_, position) => position !== index)])
+  }
+
   function removePhoto(index) {
     setPhotos((current) => current.filter((_, position) => position !== index))
     setNotice(null)
@@ -88,11 +166,10 @@ function OperatorExperienceForm() {
     const title = String(formData.get('title')).trim()
 
     if (publishing) {
-      if (!form.reportValidity()) return
-      if (totalPhotos < minPhotos) {
+      if (missing.length > 0) {
         setNotice({
           type: 'error',
-          text: `Sube al menos ${minPhotos} fotos para publicar. Faltan ${minPhotos - totalPhotos}.`,
+          text: `Completa para publicar: ${missing.map((item) => item.label.toLocaleLowerCase()).join(', ')}.`,
         })
         return
       }
@@ -115,6 +192,8 @@ function OperatorExperienceForm() {
       capacity: Number(formData.get('capacity')),
       description: String(formData.get('description')).trim(),
       photoCount: totalPhotos,
+      lat: position?.lat ?? null,
+      lng: position?.lng ?? null,
       status,
     }
     const color = status === 'Publicada' ? 'bg-cyan-100 text-cyan-800' : 'bg-stone-100 text-stone-700'
@@ -183,6 +262,7 @@ function OperatorExperienceForm() {
       <form
         key={experience?.id ?? 'new'}
         onSubmit={handleSubmit}
+        onChange={(event) => readSnapshot(event.currentTarget)}
         noValidate
         className="grid gap-6 rounded-2xl border border-black/10 bg-surface p-5 shadow-sm sm:grid-cols-2 sm:p-7 lg:gap-8 lg:p-9"
       >
@@ -216,7 +296,10 @@ function OperatorExperienceForm() {
             name="department"
             required
             value={department}
-            onChange={(event) => setDepartment(event.target.value)}
+            onChange={(event) => {
+              setDepartment(event.target.value)
+              setSnapshot((current) => ({ ...current, municipality: '' }))
+            }}
             className={inputClass}
           >
             <option value="" disabled>Selecciona un departamento</option>
@@ -280,6 +363,29 @@ function OperatorExperienceForm() {
         </div>
 
         <fieldset className="sm:col-span-2">
+          <legend className="mb-1 text-sm font-semibold text-ink">Ubicación</legend>
+          <p className="mb-3 text-sm text-muted">
+            Toca el mapa o arrastra el marcador al punto de encuentro. Es obligatoria para publicar.
+          </p>
+          <LeafletMap position={position} onChange={pickPoint} label="Mapa para elegir la ubicación de la experiencia" />
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div>
+              <label htmlFor="experience-lat" className="mb-1 block text-xs font-semibold text-ink">Latitud</label>
+              <input id="experience-lat" inputMode="decimal" value={coordText.lat} onChange={(event) => typeCoordinate('lat', event.target.value)} className={inputClass} placeholder="13.69294" />
+            </div>
+            <div>
+              <label htmlFor="experience-lng" className="mb-1 block text-xs font-semibold text-ink">Longitud</label>
+              <input id="experience-lng" inputMode="decimal" value={coordText.lng} onChange={(event) => typeCoordinate('lng', event.target.value)} className={inputClass} placeholder="-89.21819" />
+            </div>
+          </div>
+          {locationOutside && (
+            <p role="alert" className="mt-2 text-xs font-semibold text-danger">
+              Esa ubicación queda fuera de El Salvador. Elige un punto dentro del país.
+            </p>
+          )}
+        </fieldset>
+
+        <fieldset className="sm:col-span-2">
           <legend className="mb-1 text-sm font-semibold text-ink">Fotos de la experiencia</legend>
           <p className="mb-3 text-sm text-muted">
             Sube mínimo {minPhotos} fotos (máximo {maxPhotos}). La primera será la portada
@@ -309,6 +415,11 @@ function OperatorExperienceForm() {
                       ) : (
                         <span className="px-2 text-xs text-ink">{photo.file.name}</span>
                       )}
+                      {index === 0 && savedPhotoCount === 0 && (
+                        <span className="absolute left-1.5 top-1.5 rounded-full bg-brand px-2 py-0.5 text-[10px] font-bold text-white">
+                          Portada
+                        </span>
+                      )}
                       <button
                         type="button"
                         onClick={() => removePhoto(index)}
@@ -317,13 +428,34 @@ function OperatorExperienceForm() {
                       >
                         Quitar
                       </button>
+                      {photos.length > 1 && (
+                        <span className="absolute inset-x-1.5 bottom-1.5 flex justify-between gap-1">
+                          <button type="button" onClick={() => movePhoto(index, -1)} disabled={index === 0} aria-label={`Mover ${photo.file.name} antes`} className="rounded-full bg-white/90 px-2 py-0.5 text-xs font-bold text-ink shadow-sm disabled:opacity-40">
+                            ←
+                          </button>
+                          {index > 0 && savedPhotoCount === 0 && (
+                            <button type="button" onClick={() => makeCover(index)} aria-label={`Hacer portada ${photo.file.name}`} className="rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-bold text-brand shadow-sm">
+                              Hacer portada
+                            </button>
+                          )}
+                          <button type="button" onClick={() => movePhoto(index, 1)} disabled={index === photos.length - 1} aria-label={`Mover ${photo.file.name} después`} className="rounded-full bg-white/90 px-2 py-0.5 text-xs font-bold text-ink shadow-sm disabled:opacity-40">
+                            →
+                          </button>
+                        </span>
+                      )}
                     </>
                   ) : (
-                    <div>
-                      <p className="text-2xl font-bold text-brand" aria-hidden="true">+</p>
-                      <p className="text-xs font-semibold text-ink">{label}</p>
-                      <p className="text-[11px] text-muted">Obligatoria</p>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => document.getElementById('experience-photos')?.click()}
+                      disabled={totalPhotos >= maxPhotos}
+                      aria-label={`Agregar foto: ${label}`}
+                      className="flex h-full w-full flex-col items-center justify-center transition hover:bg-info-soft focus-visible:outline-2 focus-visible:outline-brand"
+                    >
+                      <span className="text-2xl font-bold text-brand" aria-hidden="true">+</span>
+                      <span className="text-xs font-semibold text-ink">{label}</span>
+                      <span className="text-[11px] text-muted">Obligatoria</span>
+                    </button>
                   )}
                 </li>
               )
@@ -367,9 +499,29 @@ function OperatorExperienceForm() {
           </p>
         )}
 
+        <section aria-labelledby="publish-checklist" className="rounded-xl border border-black/10 bg-canvas p-4 sm:col-span-2">
+          <h2 id="publish-checklist" className="text-sm font-bold text-ink">Completa para publicar</h2>
+          <p className="mt-1 text-xs text-muted">
+            {missing.length === 0
+              ? 'Todo listo: ya puedes publicarla.'
+              : `Falta ${missing.length === 1 ? '1 requisito' : `${missing.length} requisitos`}. Mientras tanto puedes guardar un borrador.`}
+          </p>
+          <ul className="mt-3 grid gap-1.5 sm:grid-cols-2">
+            {checklist.map((item) => (
+              <li key={item.label} className={`flex items-center gap-2 text-xs ${item.done ? 'text-success' : 'text-muted'}`}>
+                <span aria-hidden="true">{item.done ? '✓' : '○'}</span>
+                <span>
+                  {item.label}
+                  <span className="sr-only">{item.done ? ' (listo)' : ' (pendiente)'}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+
         <div className="flex flex-wrap items-center justify-end gap-3 border-t border-black/10 pt-5 sm:col-span-2">
           <p className="mr-auto text-xs text-muted">
-            Podrás publicarla cuando tenga mínimo {minPhotos} fotos, ubicación y horarios con cupos.
+            Los horarios con cupos se definen en la sección Cupos.
           </p>
           <Link to="/operador/experiencias" className="rounded-full px-5 py-2.5 text-sm font-semibold text-brand hover:bg-info-soft">
             Cancelar
@@ -383,7 +535,7 @@ function OperatorExperienceForm() {
           >
             Guardar borrador
           </button>
-          <button type="submit" name="intent" value="Publicada" disabled={saving} className="rounded-full bg-brand px-5 py-2.5 text-sm font-bold text-white transition hover:bg-brand-dark">
+          <button type="submit" name="intent" value="Publicada" disabled={saving || missing.length > 0} className="rounded-full bg-brand px-5 py-2.5 text-sm font-bold text-white transition hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50">
             {experience ? 'Publicar cambios' : 'Publicar experiencia'}
           </button>
         </div>

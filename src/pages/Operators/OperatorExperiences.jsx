@@ -22,12 +22,14 @@ const statusOptions = [
   { value: 'Publicada', label: 'Publicada' },
   { value: 'Borrador', label: 'Borrador' },
   { value: 'Desactivada', label: 'Desactivada' },
+  { value: 'Retirada', label: 'Retirada' },
 ]
 
 const statusStyles = {
   Publicada: 'bg-cyan-100 text-cyan-800',
   Borrador: 'bg-stone-100 text-stone-700',
-  Desactivada: 'bg-danger-soft text-danger',
+  Desactivada: 'bg-amber-50 text-amber-800',
+  Retirada: 'bg-danger-soft text-danger',
 }
 
 function OperatorExperiences() {
@@ -127,7 +129,7 @@ function OperatorExperiences() {
       {filteredExperiences.length ? (
         <section className="grid gap-5 sm:grid-cols-2 2xl:grid-cols-3">
           {filteredExperiences.map((experience) => (
-            <article key={experience.id} className={`overflow-hidden rounded-2xl border border-black/10 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${experience.status === 'Desactivada' ? 'opacity-70' : ''}`}>
+            <article key={experience.id} className={`overflow-hidden rounded-2xl border border-black/10 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${experience.status === 'Desactivada' || experience.status === 'Retirada' ? 'opacity-70' : ''}`}>
               <div className="grid h-44 place-items-center bg-info-soft text-5xl" aria-hidden="true">
                 {categoryIcons[experience.category] ?? '✨'}
               </div>
@@ -153,6 +155,13 @@ function OperatorExperiences() {
                 >
                   Editar experiencia
                 </Link>
+                {experience.status === 'Retirada' && (
+                  <p role="note" className="mt-3 rounded-xl bg-danger-soft px-3 py-2 text-xs leading-5 text-danger">
+                    <strong>Retirada por el administrador.</strong>{' '}
+                    {experience.withdrawReason ? `Motivo: ${experience.withdrawReason}` : 'Contacta a soporte para más detalles.'}
+                  </p>
+                )}
+                {experience.status !== 'Retirada' && (
                 <button
                   type="button"
                   onClick={() => setPending(experience)}
@@ -161,6 +170,7 @@ function OperatorExperiences() {
                 >
                   {experience.status === 'Desactivada' ? 'Reactivar' : 'Desactivar'}
                 </button>
+                )}
               </div>
             </article>
           ))}

@@ -1,6 +1,7 @@
 //PANEL DE CUPOS DE EXPERIENCIAS
 
 import { useMemo, useState } from 'react'
+import Dialog from '../../components/admin/Dialog.jsx'
 import CuposCalendar from '../../components/operator/CuposCalendar.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 import {
@@ -112,6 +113,9 @@ function OperatorAvailability() {
   const [editingId, setEditingId] = useState(null)
   const [adding, setAdding] = useState(false)
   const [notice, setNotice] = useState(null)
+  const [cancelling, setCancelling] = useState(null)
+  const [cancelReason, setCancelReason] = useState('')
+  const [cancelError, setCancelError] = useState('')
   const [selectedDate, setSelectedDate] = useState(() => pickInitialDate(initialRows))
   const experienceById = new Map(experiences.map((experience) => [String(experience.id), experience]))
   const filteredRows = rows.filter((item) => {
@@ -128,6 +132,63 @@ function OperatorAvailability() {
       type: 'success',
       text: 'Disponibilidad guardada en este navegador; estos datos quedan listos para conectarse al backend.',
     })
+  }
+
+  // Reservas activas que caen en una sesión (misma experiencia, día y hora).
+  function reservationsOfSession(session) {
+    return readOperatorCollection(user, 'reservations').filter((reservation) => {
+      if (String(reservation.experienceId) !== String(session.experienceId)) return false
+      if (reservation.status !== 'Pendiente' && reservation.status !== 'Confirmada') return false
+      if (!reservation.startsAt) return false
+      const start = new Date(reservation.startsAt)
+      const pad = (value) => String(value).padStart(2, '0')
+      return (
+        `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}` === session.date &&
+        `${pad(start.getHours())}:${pad(start.getMinutes())}` === session.time
+      )
+    })
+  }
+
+  function openCancel(session) {
+    setCancelling({ session, affected: reservationsOfSession(session) })
+    setCancelReason('')
+    setCancelError('')
+  }
+
+  function confirmCancelSession(event) {
+    event.preventDefault()
+    const motive = cancelReason.trim()
+    if (!motive) {
+      setCancelError('El motivo es obligatorio.')
+      return
+    }
+    const { session, affected } = cancelling
+    try {
+      const updatedRows = rows.map((item) =>
+        item.id === session.id ? { ...item, available: 0, closed: true, closedReason: motive } : item,
+      )
+      saveOperatorCollection(user, 'availability', updatedRows)
+      if (affected.length > 0) {
+        const ids = new Set(affected.map((reservation) => reservation.id))
+        const updatedReservations = readOperatorCollection(user, 'reservations').map((reservation) =>
+          ids.has(reservation.id)
+            ? { ...reservation, status: 'Pendiente de decisión', cancelReason: motive }
+            : reservation,
+        )
+        saveOperatorCollection(user, 'reservations', updatedReservations)
+      }
+      setRows(updatedRows)
+      setNotice({
+        type: 'success',
+        text:
+          affected.length > 0
+            ? `Sesión cancelada. ${affected.length} ${affected.length === 1 ? 'reserva quedó' : 'reservas quedaron'} pendiente de decisión del viajero (reagendar o reembolso).`
+            : 'Sesión cancelada. No tenía reservas.',
+      })
+    } catch (error) {
+      setNotice({ type: 'error', text: `No se pudo cancelar la sesión: ${error.message}` })
+    }
+    setCancelling(null)
   }
 
   function handleSave(values, validationError) {
@@ -256,9 +317,24 @@ function OperatorAvailability() {
                   <p className="text-base font-bold text-ink">{item.time} · {experience?.title ?? 'Experiencia no disponible'}</p>
                 </div>
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-black/10 pt-4">
-                  <span className="text-sm font-semibold text-brand">
-                    {item.available} de {item.capacity} espacios disponibles
-                  </span>
+                  {item.closed ? (
+                    <span className="text-sm font-semibold text-danger">Sesión cancelada</span>
+                  ) : (
+                    <span className="text-sm font-semibold text-brand">
+                      {item.available} de {item.capacity} espacios disponibles
+                    </span>
+                  )}
+                  {!item.closed && (
+                    <button
+                      type="button"
+                      onClick={() => openCancel(item)}
+                      aria-label={`Cancelar sesión de las ${item.time}`}
+                      className="rounded-full border border-black/15 px-4 py-2 text-sm font-semibold text-danger transition hover:bg-danger-soft"
+                    >
+                      Cancelar sesión
+                    </button>
+                  )}
+                  {!item.closed && (
                   <button
                     type="button"
                     aria-expanded={editingId === item.id}
@@ -271,6 +347,7 @@ function OperatorAvailability() {
                   >
                     {editingId === item.id ? 'Cerrar edición' : 'Editar cupos'}
                   </button>
+                  )}
                 </div>
                 {editingId === item.id && (
                   <div className="mt-5 border-t border-black/10 pt-5">
@@ -295,6 +372,54 @@ function OperatorAvailability() {
       <p className="text-xs leading-5 text-muted">
         Disponibilidad de ejemplo guardada en este navegador y aislada por perfil.
       </p>
+
+      {cancelling && (
+        <Dialog title="Cancelar sesión" onClose={() => setCancelling(null)}>
+          <form onSubmit={confirmCancelSession} noValidate className="mt-4 grid gap-4">
+            <p className="text-sm text-muted">
+              {cancelling.session.date} · {cancelling.session.time}. Se cierra la disponibilidad y se avisa a los viajeros afectados.
+            </p>
+            <div>
+              <p className="text-sm font-semibold text-ink">Reservas afectadas ({cancelling.affected.length})</p>
+              {cancelling.affected.length === 0 ? (
+                <p className="mt-1 text-sm text-muted">Ninguna reserva activa en esta sesión.</p>
+              ) : (
+                <ul className="mt-2 grid gap-1.5 text-sm text-ink">
+                  {cancelling.affected.map((reservation) => (
+                    <li key={reservation.id} className="rounded-lg bg-canvas px-3 py-2">
+                      {reservation.guest} · {reservation.guests} {reservation.guests === 1 ? 'viajero' : 'viajeros'} · {reservation.id}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {cancelling.affected.length > 0 && (
+                <p className="mt-2 text-xs text-muted">
+                  Cada viajero tendrá 1 mes para reagendar (mismo precio) o pedir el reembolso completo.
+                </p>
+              )}
+            </div>
+            <label className="grid gap-1.5 text-sm font-semibold text-ink" htmlFor="cancel-session-reason">
+              Motivo
+              <textarea
+                id="cancel-session-reason"
+                rows="3"
+                value={cancelReason}
+                onChange={(event) => { setCancelReason(event.target.value); setCancelError('') }}
+                className="w-full rounded-xl border border-black/15 bg-white px-3 py-3 text-sm font-normal text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/15"
+              />
+            </label>
+            {cancelError && <p role="alert" className="text-sm font-semibold text-danger">{cancelError}</p>}
+            <div className="flex justify-end gap-3">
+              <button type="button" onClick={() => setCancelling(null)} className="rounded-xl border border-black/15 px-5 py-2.5 text-sm font-semibold text-ink hover:bg-canvas">
+                Volver
+              </button>
+              <button type="submit" className="rounded-xl bg-danger px-5 py-2.5 text-sm font-bold text-white hover:opacity-90">
+                Cancelar sesión
+              </button>
+            </div>
+          </form>
+        </Dialog>
+      )}
     </div>
   )
 }
