@@ -1,309 +1,194 @@
-//PANEL DE RESUMEN OPERADOR 
-
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { BarChart, ChartCard, DonutChart, LineChart } from '../../components/operator/Charts.jsx'
-import CuposCalendar from '../../components/operator/CuposCalendar.jsx'
-import { useAuth } from '../../context/AuthContext.jsx'
+import Pill from '../../components/admin/Pill.jsx'
 import {
-  cancellationShare,
-  dayRangeLabel,
-  lastDays,
-  monthlyCumulative,
-  occupancy as computeOccupancy,
-  reservationsByDay,
-  revenueByDay,
-} from '../../lib/operatorMetrics.js'
-import { formatCurrency } from './operatorData.js'
+  getMyAvailabilities,
+  getOperatorRefunds,
+  getOperatorReservations,
+} from '../../lib/bookingApi.js'
+import { extractApiError, getMyExperiences } from '../../lib/catalogApi.js'
 import {
-  getOperatorDisplayName,
-  readOperatorCollection,
-} from './operatorRepository.js'
-import ReservationStatus from './ReservationStatus.jsx'
+  formatCurrency,
+  formatDateReadable,
+  reservationStatusMeta,
+} from '../../lib/formatters.js'
 
 function OperatorDashboard() {
-  const { user } = useAuth()
-  const operatorName = getOperatorDisplayName(user)
-  const [showStatistics, setShowStatistics] = useState(true)
-  const [calendarDate, setCalendarDate] = useState('')
-  const { experiences, reservations, reviews, availability } = useMemo(
-    () => ({
-      experiences: readOperatorCollection(user, 'experiences'),
-      // Las métricas, los listados de reservas y las reseñas se alimentarán de la API de
-      // reportes en el Sprint 3. Mientras tanto el resumen se muestra en cero, sin datos de ejemplo.
-      reservations: [],
-      reviews: [],
-      availability: readOperatorCollection(user, 'availability'),
-    }),
-    [user],
-  )
+  const [experiences, setExperiences] = useState([])
+  const [availabilities, setAvailabilities] = useState([])
+  const [reservations, setReservations] = useState([])
+  const [refunds, setRefunds] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [errorMessage, setErrorMessage] = useState('')
 
-  const metricsAvailability = []
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      setLoading(true)
+      setErrorMessage('')
+      try {
+        const [expRes, availList, resRes, refundList] = await Promise.all([
+          getMyExperiences({ pageNumber: 1, pageSize: 100 }),
+          getMyAvailabilities(),
+          getOperatorReservations({ pageNumber: 1, pageSize: 100 }),
+          getOperatorRefunds(),
+        ])
+        if (cancelled) return
+        setExperiences(expRes?.data ?? [])
+        setAvailabilities(availList ?? [])
+        setReservations(resRes?.data ?? [])
+        setRefunds(refundList ?? [])
+      } catch (error) {
+        if (!cancelled) {
+          setErrorMessage(extractApiError(error, 'No se pudo cargar el resumen del operador.').message)
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
-  const firstDate = availability.map((item) => item.date).sort()[0]
-  const monthBase = firstDate ? new Date(`${firstDate}T00:00:00`) : new Date()
-  const calendarMonth = { year: monthBase.getFullYear(), month: monthBase.getMonth() }
+  const stats = useMemo(() => {
+    const published = experiences.filter((e) => e.status === 'PUBLICADA').length
+    const activeReservations = reservations.filter(
+      (r) => r.status === 'PENDIENTE' || r.status === 'CONFIRMADA',
+    ).length
+    const pendingConfirm = reservations.filter((r) => r.status === 'PENDIENTE').length
+    const pendingRefunds = refunds.filter((rf) => rf.status === 'EN_PROCESO').length
+    const revenue = reservations
+      .filter((r) => r.status === 'CONFIRMADA' || r.status === 'COMPLETADA')
+      .reduce((acc, r) => acc + Number(r.total ?? 0), 0)
+    const openSlots = availabilities.filter((a) => a.status === 'ABIERTA').length
 
-  const week = lastDays(7)
-  const dailyReservations = reservationsByDay(reservations, week)
-  const dailyRevenue = revenueByDay(reservations, experiences, week)
-  const weekReservations = dailyReservations.reduce((sum, item) => sum + item.value, 0)
-  const weekRevenue = dailyRevenue.reduce((sum, item) => sum + item.value, 0)
-  const occupancyData = computeOccupancy(metricsAvailability)
-  const cancellations = cancellationShare(reservations)
-  const evolution = monthlyCumulative(reservations, 6)
-  const monthName = new Intl.DateTimeFormat('es-SV', { month: 'long', year: 'numeric' }).format(new Date())
-
-  const confirmedReservations = reservations.filter(
-    (reservation) => reservation.status === 'Confirmada',
-  )
-  const pendingReservations = reservations.filter(
-    (reservation) => reservation.status === 'Pendiente',
-  )
-  const canceledReservations = reservations.filter(
-    (reservation) => reservation.status === 'Cancelada',
-  )
-  const paidReservations = reservations.filter(
-    (reservation) => reservation.status === 'Confirmada' || reservation.status === 'Completada',
-  )
-  const revenue = paidReservations.reduce((total, reservation) => {
-    const experience = experiences.find(
-      (item) => String(item.id) === String(reservation.experienceId),
-    )
-    return total + (experience?.price ?? 0) * reservation.guests
-  }, 0)
-  const totalCapacity = metricsAvailability.reduce(
-    (total, item) => total + Number(item.capacity || 0),
-    0,
-  )
-  const assignedCapacity = metricsAvailability.reduce(
-    (total, item) =>
-      total + Math.max(0, Number(item.capacity || 0) - Number(item.available || 0)),
-    0,
-  )
-  const occupancy = totalCapacity
-    ? Math.round((assignedCapacity / totalCapacity) * 100)
-    : 0
-  const averageRating = reviews.length
-    ? (
-        reviews.reduce((total, review) => total + Number(review.rating || 0), 0) /
-        reviews.length
-      ).toFixed(1)
-    : '—'
-  const stats = [
-    {
-      label: 'Reservas registradas',
-      value: String(reservations.length),
-      detail: `${confirmedReservations.length} confirmadas · ${pendingReservations.length} pendientes · ${canceledReservations.length} canceladas`,
-    },
-    {
-      label: 'Ingresos confirmados',
-      value: formatCurrency(revenue),
-      detail: `${paidReservations.reduce((total, item) => total + item.guests, 0)} viajeros confirmados o atendidos`,
-    },
-    {
-      label: 'Ocupación',
-      value: `${occupancy}%`,
-      detail: `${assignedCapacity} cupos asignados de ${totalCapacity}`,
-    },
-    {
-      label: 'Valoración',
-      value: `${averageRating} / 5`,
-      detail: `${reviews.length} reseñas de viajeros`,
-    },
-  ]
+    return {
+      published,
+      totalExperiences: experiences.length,
+      activeReservations,
+      pendingConfirm,
+      pendingRefunds,
+      revenue,
+      openSlots,
+    }
+  }, [experiences, availabilities, reservations, refunds])
 
   return (
-    <div className="space-y-7 lg:space-y-9">
+    <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-ink">Resumen</h1>
-          <p className="mt-2 text-sm leading-6 text-muted">
-            Hola, {operatorName}. Aquí tienes la actividad de tu negocio.
+          <p className="text-xs font-bold uppercase tracking-wide text-brand">Panel de operador</p>
+          <h1 className="mt-1 text-3xl font-bold text-ink">Resumen operativo</h1>
+          <p className="mt-1 text-sm text-muted">
+            Métricas en vivo de tus experiencias, sesiones con cupos, reservas y reembolsos.
           </p>
         </div>
-        <button
-          type="button"
-          aria-expanded={showStatistics}
-          aria-controls="operator-statistics"
-          onClick={() => setShowStatistics((visible) => !visible)}
-          className="rounded-full border border-black/15 bg-white px-4 py-2.5 text-sm font-bold text-brand transition hover:border-brand hover:bg-info-soft"
-        >
-          {showStatistics ? 'Ocultar estadísticas' : 'Mostrar estadísticas'}
-        </button>
-      </header>
-
-      <section
-        id="operator-statistics"
-        aria-label="Estadísticas del negocio"
-        hidden={!showStatistics}
-        className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-4"
-      >
-        {stats.map((stat) => (
-          <article
-            key={stat.label}
-            className="flex min-h-40 flex-col justify-between rounded-2xl border border-black/10 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:p-6"
-          >
-            <p className="text-sm font-medium text-muted">{stat.label}</p>
-            <p className="my-4 text-3xl font-extrabold tracking-tight text-ink">
-              {stat.value}
-            </p>
-            <p className="text-xs leading-5 text-muted">{stat.detail}</p>
-          </article>
-        ))}
-      </section>
-
-      <section aria-labelledby="operator-calendar-title" className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 id="operator-calendar-title" className="text-lg font-bold text-ink">Disponibilidad</h2>
-          <Link to="/operador/cupos" className="text-sm font-semibold text-brand hover:text-brand-dark">
-            Editar cupos →
-          </Link>
-        </div>
-        <CuposCalendar
-          rows={availability}
-          selectedDate={calendarDate}
-          onSelect={setCalendarDate}
-          initialMonth={calendarMonth}
-        />
-      </section>
-
-      <section aria-labelledby="operator-charts-title" className="space-y-4">
-        <h2 id="operator-charts-title" className="text-lg font-bold capitalize text-ink">
-          Gráficos · {monthName}
-        </h2>
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          <ChartCard
-            title="Reservas por día"
-            subtitle={`${weekReservations} ${weekReservations === 1 ? 'reserva' : 'reservas'} en los últimos 7 días`}
-            badge={dayRangeLabel(week)}
-          >
-            <BarChart data={dailyReservations} label="Reservas por día" />
-          </ChartCard>
-          <ChartCard title="Ingresos por día" subtitle={`Total semanal: ${formatCurrency(weekRevenue)}`} badge="USD">
-            <BarChart data={dailyRevenue} label="Ingresos por día" format={(value) => `$${value}`} />
-          </ChartCard>
-          <ChartCard
-            title="Ocupación"
-            subtitle={`${occupancyData.assigned} cupos asignados de ${occupancyData.total}`}
-            badge={`${occupancyData.percent}%`}
-          >
-            <DonutChart
-              percent={occupancyData.percent}
-              caption="ocupación"
-              items={[
-                { label: 'Asignados', value: occupancyData.assigned, color: '#087e9a' },
-                { label: 'Disponibles', value: occupancyData.free, color: '#dfe8eb' },
-              ]}
-            />
-          </ChartCard>
-          <div className="md:col-span-2 xl:col-span-2">
-            <ChartCard title="Evolución de reservas" subtitle="Reservas acumuladas · últimos 6 meses" badge="Histórico">
-              <LineChart data={evolution} label="Evolución de reservas acumuladas" />
-            </ChartCard>
-          </div>
-          <ChartCard
-            title="Reservas canceladas"
-            subtitle={`${cancellations.canceled} de ${cancellations.total} reservas se cancelaron`}
-            badge={`${cancellations.percent}%`}
-          >
-            <DonutChart
-              percent={cancellations.percent}
-              caption="canceladas"
-              accent="#9a641f"
-              items={[
-                { label: 'Canceladas', value: cancellations.canceled, color: '#9a641f' },
-                { label: 'Realizadas o vigentes', value: cancellations.kept, color: '#dfe8eb' },
-              ]}
-            />
-          </ChartCard>
-        </div>
-      </section>
-
-      <div className="grid gap-5 xl:grid-cols-2">
-        <section className="rounded-2xl border border-black/10 bg-white p-5 shadow-sm sm:p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-bold text-ink">Próximas reservas</h2>
-              <p className="mt-1 text-sm text-muted">Actividad registrada de tus viajeros.</p>
-            </div>
-            <Link to="/operador/reservas" className="text-sm font-semibold text-brand hover:text-brand-dark">
-              Ver historial
-            </Link>
-          </div>
-          {reservations.length ? (
-            <div className="mt-4 divide-y divide-black/10">
-              {reservations.slice(0, 3).map((reservation) => (
-                <article key={reservation.id} className="py-4 first:pt-1 last:pb-1">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-semibold text-ink">{reservation.guest}</p>
-                      <p className="mt-1 text-sm text-muted">
-                        {experiences.find((item) => String(item.id) === String(reservation.experienceId))?.title ?? reservation.experience}
-                      </p>
-                      <p className="mt-1 text-xs text-muted">
-                        {reservation.date} · {reservation.guests}{' '}
-                        {reservation.guests === 1 ? 'viajero' : 'viajeros'}
-                      </p>
-                    </div>
-                    <ReservationStatus status={reservation.status} />
-                  </div>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <p className="mt-5 rounded-xl border border-dashed border-black/15 p-5 text-sm text-muted">
-              Aún no tienes reservas registradas.
-            </p>
-          )}
-        </section>
-
-        <section className="rounded-2xl border border-black/10 bg-white p-5 shadow-sm sm:p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-bold text-ink">Mis experiencias</h2>
-              <p className="mt-1 text-sm text-muted">Gestiona tus actividades publicadas.</p>
-            </div>
-            <Link to="/operador/experiencias" className="text-sm font-semibold text-brand hover:text-brand-dark">
-              Ver todas
-            </Link>
-          </div>
-          {experiences.length ? (
-            <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              {experiences.slice(0, 2).map((experience) => (
-                <article
-                  key={experience.id}
-                  className="flex min-w-0 items-center gap-4 rounded-xl border border-black/10 bg-canvas p-4"
-                >
-                  <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-info-soft text-2xl" aria-hidden="true">
-                    {experience.category === 'Aventura' ? '🌊' : experience.category === 'Cultura y café' ? '☕' : '✨'}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="truncate font-semibold text-ink">{experience.title}</p>
-                    <p className="mt-1 text-xs leading-5 text-muted">
-                      {experience.location} · {formatCurrency(experience.price)} por persona
-                    </p>
-                  </div>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <p className="mt-5 rounded-xl border border-dashed border-black/15 p-5 text-sm text-muted">
-              Aún no has creado experiencias.
-            </p>
-          )}
+        <div className="flex flex-wrap gap-2">
           <Link
             to="/operador/experiencias/nueva"
-            className="mt-5 flex min-h-12 items-center justify-center rounded-xl border border-black/15 px-4 text-sm font-semibold text-brand transition hover:border-brand hover:bg-info-soft"
+            className="rounded-full bg-brand px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-dark"
           >
-            + Agregar experiencia
+            + Nueva experiencia
           </Link>
-        </section>
-      </div>
+          <Link
+            to="/operador/cupos"
+            className="rounded-full border border-mist bg-surface px-4 py-2.5 text-sm font-semibold text-ink hover:border-brand"
+          >
+            Gestionar cupos
+          </Link>
+        </div>
+      </header>
 
-      <p className="text-xs leading-5 text-muted">
-        Información de ejemplo guardada por perfil en este navegador; se reemplazará por datos del backend al integrarlo.
-      </p>
+      {errorMessage && (
+        <div role="alert" className="rounded-2xl border border-danger/30 bg-danger-soft p-4 text-sm text-danger">
+          {errorMessage}
+        </div>
+      )}
+
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-2xl border border-mist bg-surface p-5">
+          <p className="text-xs font-semibold uppercase text-muted">Experiencias publicadas</p>
+          <p className="mt-2 text-3xl font-extrabold text-ink">
+            {loading ? '—' : stats.published}
+            <span className="ml-1 text-sm font-normal text-muted">/ {stats.totalExperiences}</span>
+          </p>
+        </div>
+        <div className="rounded-2xl border border-mist bg-surface p-5">
+          <p className="text-xs font-semibold uppercase text-muted">Reservas activas</p>
+          <p className="mt-2 text-3xl font-extrabold text-ink">
+            {loading ? '—' : stats.activeReservations}
+          </p>
+          <p className="mt-1 text-xs text-muted">{stats.pendingConfirm} pendientes de confirmar</p>
+        </div>
+        <div className="rounded-2xl border border-mist bg-surface p-5">
+          <p className="text-xs font-semibold uppercase text-muted">Sesiones abiertas</p>
+          <p className="mt-2 text-3xl font-extrabold text-ink">
+            {loading ? '—' : stats.openSlots}
+          </p>
+          <p className="mt-1 text-xs text-muted">{stats.pendingRefunds} reembolsos en proceso</p>
+        </div>
+        <div className="rounded-2xl border border-mist bg-surface p-5">
+          <p className="text-xs font-semibold uppercase text-muted">Ingresos confirmados (demo)</p>
+          <p className="mt-2 text-3xl font-extrabold text-brand">
+            {loading ? '—' : formatCurrency(stats.revenue)}
+          </p>
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-mist bg-surface p-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-ink">Reservas recientes</h2>
+          <Link to="/operador/reservas" className="text-sm font-semibold text-brand hover:underline">
+            Ver todas →
+          </Link>
+        </div>
+
+        {loading ? (
+          <p className="mt-4 text-sm text-muted">Cargando reservas...</p>
+        ) : reservations.length === 0 ? (
+          <p className="mt-4 text-sm text-muted">Todavía no has recibido reservas.</p>
+        ) : (
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="border-b border-mist text-xs uppercase text-muted">
+                <tr>
+                  <th className="py-2 pr-4">Código</th>
+                  <th className="py-2 pr-4">Experiencia</th>
+                  <th className="py-2 pr-4">Visitante</th>
+                  <th className="py-2 pr-4">Fecha</th>
+                  <th className="py-2 pr-4">Total</th>
+                  <th className="py-2">Estado</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-mist">
+                {reservations.slice(0, 6).map((r) => {
+                  const st = reservationStatusMeta[r.status] ?? { label: r.status, tone: 'neutral' }
+                  return (
+                    <tr key={r.id}>
+                      <td className="py-3 pr-4 font-mono text-xs font-bold text-brand">
+                        {r.reservationCode}
+                      </td>
+                      <td className="py-3 pr-4 font-medium text-ink">{r.experienceTitle}</td>
+                      <td className="py-3 pr-4 text-muted">{r.contactName}</td>
+                      <td className="py-3 pr-4 text-muted">
+                        {formatDateReadable(r.activityDate)} · {r.startTime}
+                      </td>
+                      <td className="py-3 pr-4 font-semibold text-ink">
+                        {formatCurrency(r.total, r.currency)}
+                      </td>
+                      <td className="py-3">
+                        <Pill tone={st.tone}>{st.label}</Pill>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   )
 }

@@ -1,131 +1,134 @@
-// Panel del admin: todas las experiencias, con búsqueda y filtros (mismo patrón que RequestsQueue).
-import { useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import AdminPageHeader from '../../components/admin/AdminPageHeader.jsx'
-import FilterSelect from '../../components/admin/FilterSelect.jsx'
 import Pill from '../../components/admin/Pill.jsx'
-import SearchInput from '../../components/admin/SearchInput.jsx'
-import useAdminSearch from '../../lib/useAdminSearch.js'
-import { formatCurrency } from '../Operators/operatorData.js'
-import { readAllExperiences } from '../Operators/operatorRepository.js'
-
-const statusTone = {
-  Publicada: 'success',
-  Borrador: 'neutral',
-  Desactivada: 'pending',
-  Retirada: 'danger',
-}
+import { extractApiError, getMyExperiences, resolveAssetUrl } from '../../lib/catalogApi.js'
+import { experienceStatusMeta, formatCurrency } from '../../lib/formatters.js'
 
 const statusOptions = [
-  { value: 'todos', label: 'Estado: todas' },
-  { value: 'Publicada', label: 'Estado: Publicadas' },
-  { value: 'Borrador', label: 'Estado: Borradores' },
-  { value: 'Desactivada', label: 'Estado: Desactivadas' },
-  { value: 'Retirada', label: 'Estado: Retiradas' },
+  { key: '', label: 'Todas' },
+  { key: 'PUBLICADA', label: 'Publicadas' },
+  { key: 'BORRADOR', label: 'Borradores' },
+  { key: 'PAUSADA', label: 'Pausadas' },
+  { key: 'RETIRADA', label: 'Retiradas' },
 ]
 
 function AdminExperiences() {
-  const [query, setQuery] = useAdminSearch()
-  const [status, setStatus] = useState('todos')
-  const [operator, setOperator] = useState('todos')
-  const [experiences] = useState(() => readAllExperiences())
+  const [statusFilter, setStatusFilter] = useState('')
+  const [experiences, setExperiences] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [errorBanner, setErrorBanner] = useState('')
 
-  const operatorOptions = useMemo(
-    () => [
-      { value: 'todos', label: 'Operador: todos' },
-      ...[...new Set(experiences.map((item) => item.ownerName))].map((name) => ({
-        value: name,
-        label: `Operador: ${name}`,
-      })),
-    ],
-    [experiences],
-  )
-
-  const visible = useMemo(() => {
-    const term = query.trim().toLocaleLowerCase()
-    return experiences.filter((item) => {
-      if (status !== 'todos' && item.status !== status) return false
-      if (operator !== 'todos' && item.ownerName !== operator) return false
-      return (
-        !term ||
-        `${item.title} ${item.location} ${item.category} ${item.ownerName}`.toLocaleLowerCase().includes(term)
-      )
-    })
-  }, [experiences, operator, query, status])
+  useEffect(() => {
+    let cancelled = false
+    async function fetchItems() {
+      try {
+        const response = await getMyExperiences({
+          pageNumber: 1,
+          pageSize: 100,
+          status: statusFilter || undefined,
+        })
+        if (!cancelled) {
+          setErrorBanner('')
+          setExperiences(response?.data ?? [])
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setErrorBanner(extractApiError(error, 'No se pudieron cargar las experiencias.').message)
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    fetchItems()
+    return () => {
+      cancelled = true
+    }
+  }, [statusFilter])
 
   return (
-    <div className="space-y-7">
-      <AdminPageHeader
-        title="Experiencias"
-        subtitle="Revisa lo que publican los operadores y retira lo que incumpla las reglas."
-      />
+    <div className="space-y-6">
+      <header>
+        <p className="text-xs font-bold uppercase tracking-wide text-brand">Moderación (RF-A03)</p>
+        <h1 className="mt-1 text-3xl font-bold text-ink">Experiencias del marketplace</h1>
+        <p className="mt-1 text-sm text-muted">
+          Revisa el catálogo completo, modera fotografías o retira experiencias con aviso automático RN-21.
+        </p>
+      </header>
 
-      <section className="grid gap-3 md:grid-cols-[minmax(240px,1fr)_auto_auto] md:items-center">
-        <SearchInput
-          label="Buscar experiencias"
-          placeholder="Buscar por nombre, lugar u operador"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-        />
-        <FilterSelect
-          label="Filtrar por estado"
-          options={statusOptions}
-          value={status}
-          onChange={(event) => setStatus(event.target.value)}
-          className="min-h-12 md:w-52"
-        />
-        <FilterSelect
-          label="Filtrar por operador"
-          options={operatorOptions}
-          value={operator}
-          onChange={(event) => setOperator(event.target.value)}
-          className="min-h-12 md:w-56"
-        />
-      </section>
+      <div className="flex flex-wrap gap-2">
+        {statusOptions.map((opt) => (
+          <button
+            key={opt.key || 'all'}
+            type="button"
+            onClick={() => setStatusFilter(opt.key)}
+            className={`rounded-full px-4 py-1.5 text-xs font-semibold ${
+              statusFilter === opt.key
+                ? 'bg-brand text-white'
+                : 'border border-mist bg-surface text-muted hover:text-ink'
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
 
-      {visible.length === 0 ? (
-        <div className="rounded-2xl border border-mist bg-surface px-6 py-16 text-center">
-          <h2 className="text-sm font-bold text-ink">Ninguna experiencia coincide con tu búsqueda</h2>
-          <p className="mt-1 text-xs text-muted">Prueba con otros filtros.</p>
+      {errorBanner && (
+        <div role="alert" className="rounded-2xl border border-danger/30 bg-danger-soft p-4 text-sm text-danger">
+          {errorBanner}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="space-y-3">
+          {[1, 2, 3].map((n) => (
+            <div key={n} className="h-24 animate-pulse rounded-2xl bg-surface" />
+          ))}
+        </div>
+      ) : experiences.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-mist bg-surface p-10 text-center text-sm text-muted">
+          No hay experiencias registradas en este estado.
         </div>
       ) : (
-        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" aria-label="Experiencias">
-          {visible.map((item) => (
-            <li key={`${item.owner}-${item.id}`}>
-              <Link
-                to={`/admin/experiencias/${encodeURIComponent(item.owner)}/${encodeURIComponent(item.id)}`}
-                className="group flex h-full flex-col overflow-hidden rounded-2xl border border-mist bg-surface transition hover:border-brand hover:shadow-md"
+        <div className="space-y-3">
+          {experiences.map((exp) => {
+            const st = experienceStatusMeta[exp.status] ?? { label: exp.status, tone: 'neutral' }
+            const cover = exp.images?.find((i) => i.isCover) || exp.images?.[0]
+            return (
+              <article
+                key={exp.id}
+                className="flex flex-wrap items-center gap-4 rounded-2xl border border-mist bg-surface p-4"
               >
-                <span className="relative block aspect-[4/3] overflow-hidden bg-info-soft">
-                  {item.photos?.[0] ? (
-                    <img
-                      src={item.photos[0]}
-                      alt=""
-                      loading="lazy"
-                      className={`h-full w-full object-cover transition group-hover:scale-[1.03] ${item.status === 'Retirada' ? 'grayscale' : ''}`}
-                    />
-                  ) : (
-                    <span className="grid h-full w-full place-items-center px-3 text-center text-xs font-semibold text-muted">
-                      Sin foto
-                    </span>
-                  )}
-                  <Pill tone={statusTone[item.status] ?? 'neutral'} className="absolute left-3 top-3 shadow-sm">
-                    {item.status}
-                  </Pill>
-                </span>
-                <span className="flex flex-1 flex-col gap-1 p-4">
-                  <span className="text-sm font-bold leading-5 text-ink">{item.title}</span>
-                  <span className="text-xs text-muted">{item.location}</span>
-                  <span className="text-xs text-muted">{item.ownerName} · {item.category}</span>
-                  <span className="mt-auto flex items-center justify-between pt-3 text-xs">
-                    <span className="font-semibold text-ink">{formatCurrency(item.price)} / persona</span>
-                    <span className="text-muted">{item.photoCount ?? 0} fotos</span>
-                  </span>
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+                {cover?.url ? (
+                  <img
+                    src={resolveAssetUrl(cover.url)}
+                    alt={exp.title}
+                    className="h-20 w-28 shrink-0 rounded-xl object-cover"
+                  />
+                ) : (
+                  <div className="grid h-20 w-28 shrink-0 place-items-center rounded-xl bg-info-soft text-xs font-semibold text-brand">
+                    Sin foto
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Pill tone={st.tone}>{st.label}</Pill>
+                    <span className="text-xs text-muted">{exp.company?.tradeName}</span>
+                  </div>
+                  <h2 className="mt-1 text-base font-bold text-ink">{exp.title}</h2>
+                  <p className="text-xs text-muted">
+                    {exp.municipalityName}, {exp.departmentName} · {formatCurrency(exp.price, exp.currency)}
+                  </p>
+                </div>
+                <Link
+                  to={`/admin/experiencias/${exp.id}`}
+                  className="rounded-full border border-brand px-4 py-1.5 text-xs font-bold text-brand hover:bg-brand hover:text-white"
+                >
+                  Moderar
+                </Link>
+              </article>
+            )
+          })}
+        </div>
       )}
     </div>
   )

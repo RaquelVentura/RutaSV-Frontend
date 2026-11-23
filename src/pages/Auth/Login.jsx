@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
 import api from '../../config/axios';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -9,6 +9,10 @@ export default function Login() {
   const [notice, setNotice] = useState('');
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const redirectTarget = location.state?.from?.pathname
+    ? `${location.state.from.pathname}${location.state.from.search || ''}`
+    : '/';
 
   function getFieldError(input) {
     if (input.validity.valueMissing) {
@@ -50,8 +54,7 @@ export default function Login() {
 
       login(loginData.token);
 
-      // Retorna al inicio "/" de la app
-      navigate('/');
+      navigate(redirectTarget, { replace: true });
     } catch (error) {
       console.error('Login failed:', error);
       setNotice('Error al iniciar sesión. Por favor, verifica tus credenciales.');
@@ -78,7 +81,7 @@ export default function Login() {
           : response.data?.token;
 
       login(token);
-      navigate('/');
+      navigate(redirectTarget, { replace: true });
     } catch (error) {
       console.error('Google login failed:', error);
       const backendMessage =

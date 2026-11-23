@@ -180,6 +180,8 @@ describe('Vistas de administrador', () => {
     const menu = within(screen.getByRole('menu'))
     expect(menu.getAllByRole('menuitem').map((item) => item.textContent)).toEqual([
       'Mi perfil',
+      'Mis reservas',
+      'Favoritos',
       'Panel de administración',
       'Ver sitio',
       'Cerrar sesión',

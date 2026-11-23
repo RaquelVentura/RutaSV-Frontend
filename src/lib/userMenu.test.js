@@ -9,12 +9,18 @@ describe('menú de usuario', () => {
   })
 
   it('ofrece las mismas opciones para el visitante', () => {
-    expect(labels({ role: 'VISITANTE', emailVerified: true })).toEqual(['Mi perfil'])
+    expect(labels({ role: 'VISITANTE', emailVerified: true })).toEqual([
+      'Mi perfil',
+      'Mis reservas',
+      'Favoritos',
+    ])
   })
 
   it('agrega el panel y Ver sitio para el operador', () => {
     expect(labels({ role: 'OPERADOR', emailVerified: true })).toEqual([
       'Mi perfil',
+      'Mis reservas',
+      'Favoritos',
       'Panel de operador',
       'Configuración del negocio',
       'Ver sitio',
@@ -24,6 +30,8 @@ describe('menú de usuario', () => {
   it('agrega el panel y Ver sitio para el administrador', () => {
     expect(labels({ role: 'ADMIN', emailVerified: true })).toEqual([
       'Mi perfil',
+      'Mis reservas',
+      'Favoritos',
       'Panel de administración',
       'Ver sitio',
     ])

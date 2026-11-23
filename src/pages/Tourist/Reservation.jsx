@@ -1,291 +1,361 @@
+import { useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext.jsx'
+import { createWebReservation } from '../../lib/bookingApi.js'
+import { extractApiError, resolveAssetUrl } from '../../lib/catalogApi.js'
+import { formatCurrency, formatDateReadable } from '../../lib/formatters.js'
+import { notify } from '../../lib/notify.js'
 
-import { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext.jsx';
-import Container from '../../components/turista/Container.jsx';
-import { defaultBooking, formatUsd, paymentMethods } from '../../data/turista.js';
+function Reservation() {
+  const { user } = useAuth()
+  const location = useLocation()
+  const navigate = useNavigate()
 
-const inputClass =
-  'w-full rounded-xl border bg-white px-3.5 py-3.5 text-[14px] text-[#102F3B] outline-none placeholder:text-[#637780] focus:border-[#087E9A]';
-const cardInputClass =
-  'w-full rounded-[10px] border bg-white px-3.5 py-3 text-[14px] text-[#102F3B] outline-none placeholder:text-[#637780] focus:border-[#087E9A]';
+  const bookingState = location.state || {}
+  const experience = bookingState.experience || null
+  const availability = bookingState.availability || null
+  const peopleCount = Number(bookingState.peopleCount ?? 1)
 
-const steps = [
-  { id: 1, label: 'Experiencia elegida', state: 'done' },
-  { id: 2, label: 'Datos y pago', state: 'current' },
-  { id: 3, label: 'Tu reserva', state: 'pending' },
-];
+  const initialName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.name || ''
+  const [contactName, setContactName] = useState(initialName)
+  const [contactEmail, setContactEmail] = useState(user?.email || '')
+  const [contactPhone, setContactPhone] = useState('')
+  const [specialNotes, setSpecialNotes] = useState('')
+  const [paymentMethod, setPaymentMethod] = useState('TARJETA_DEMO')
+  const [cardHolder, setCardHolder] = useState(initialName)
+  const [cardNumber, setCardNumber] = useState('')
+  const [cardExpiry, setCardExpiry] = useState('')
+  const [cardCvv, setCardCvv] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [errorBanner, setErrorBanner] = useState('')
+  const [needsVerification, setNeedsVerification] = useState(false)
 
-const onlyDigits = (value) => value.replace(/\D/g, '');
-const formatCardNumber = (value) => onlyDigits(value).slice(0, 16).replace(/(\d{4})(?=\d)/g, '$1 ');
-const formatExpiry = (value) => {
-  const digits = onlyDigits(value).slice(0, 4);
-  return digits.length > 2 ? `${digits.slice(0, 2)} / ${digits.slice(2)}` : digits;
-};
-
-function Field({ id, label, error, hint, small = false, children }) {
-  return (
-    <div className="flex flex-col gap-2">
-      <label htmlFor={id} className={`${small ? 'text-[13px]' : 'text-[14px]'} font-semibold text-[#102F3B]`}>
-        {label}
-      </label>
-      {children}
-      {hint && !error && <p className="text-[12px] text-[#637780]">{hint}</p>}
-      {error && (
-        <p id={`${id}-error`} role="alert" className="text-[12px] font-medium text-[#B42318]">
-          {error}
+  if (!experience || !availability) {
+    return (
+      <div className="mx-auto max-w-3xl px-6 py-16 text-center">
+        <h1 className="text-3xl font-bold text-ink">Selecciona una experiencia primero</h1>
+        <p className="mt-2 text-sm text-muted">
+          Para iniciar una reservación elige una experiencia, una fecha y la cantidad de cupos disponibles.
         </p>
-      )}
-    </div>
-  );
-}
+        <Link
+          to="/experiencias"
+          className="mt-6 inline-block rounded-full bg-brand px-6 py-3 text-sm font-semibold text-white hover:bg-brand-dark"
+        >
+          Explorar experiencias
+        </Link>
+      </div>
+    )
+  }
 
-function StepIndicator() {
+  const unitPrice = Number(availability.effectivePrice ?? experience.price ?? 0)
+  const totalAmount = unitPrice * peopleCount
+
+  function validateForm() {
+    if (!contactName.trim()) return 'Ingresa el nombre del titular de la reserva.'
+    if (!contactEmail.trim() || !contactEmail.includes('@')) return 'Ingresa un correo electrónico válido.'
+    if (paymentMethod === 'TARJETA_DEMO') {
+      const digits = cardNumber.replace(/\D/g, '')
+      if (!cardHolder.trim()) return 'Ingresa el nombre en la tarjeta (simulada).'
+      if (digits.length < 12 || digits.length > 19) return 'Ingresa un número de tarjeta simulado válido (12-19 dígitos).'
+      if (!/^\d{2}\/\d{2}$/.test(cardExpiry.trim())) return 'Ingresa el vencimiento en formato MM/AA.'
+      if (!/^\d{3,4}$/.test(cardCvv.trim())) return 'Ingresa un código CVV simulado de 3 o 4 dígitos.'
+    }
+    return ''
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault()
+    setErrorBanner('')
+    setNeedsVerification(false)
+
+    const validationError = validateForm()
+    if (validationError) {
+      setErrorBanner(validationError)
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const created = await createWebReservation({
+        experienceId: experience.id,
+        availabilityId: availability.id,
+        peopleCount,
+        contactName: contactName.trim(),
+        contactEmail: contactEmail.trim(),
+        contactPhone: contactPhone.trim() || null,
+        specialNotes: specialNotes.trim() || null,
+        paymentMethod,
+      })
+
+      notify.success(`Reserva ${created.reservationCode} creada correctamente.`)
+      navigate(`/turista/reservar/confirmacion?id=${created.id}`, {
+        replace: true,
+        state: { reservation: created },
+      })
+    } catch (error) {
+      const parsed = extractApiError(error, 'No se pudo completar la reserva.')
+      if (parsed.code === 'EMAIL_NO_VERIFICADO' || parsed.status === 403) {
+        setNeedsVerification(true)
+      }
+      setErrorBanner(parsed.message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const coverUrl =
+    resolveAssetUrl(experience.images?.[0]?.url || experience.coverImageUrl) ||
+    'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=70'
+
   return (
-    <ol className="flex items-center gap-3 sm:gap-4" aria-label="Pasos de la reserva">
-      {steps.map((step, index) => (
-        <li key={step.id} className={`flex items-center gap-3 sm:gap-4 ${index > 0 ? 'flex-1' : ''}`}>
-          {index > 0 && (
-            <span className={`h-0.5 flex-1 ${steps[index - 1].state === 'done' ? 'bg-[#087E9A]' : 'bg-[#C9D8DE]'}`} />
+    <div className="mx-auto max-w-6xl space-y-6 px-6 py-8">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <Link to={`/experiencias/${experience.slug}`} className="text-sm font-semibold text-brand hover:underline">
+            ← Volver a la experiencia
+          </Link>
+          <h1 className="mt-2 text-3xl font-bold text-ink">Confirmar reserva y pago demo</h1>
+        </div>
+        <span className="rounded-full bg-info-soft px-3.5 py-1.5 text-xs font-bold text-brand">
+          Entorno de pago simulado (sin cargos reales)
+        </span>
+      </div>
+
+      {errorBanner && (
+        <div role="alert" className="rounded-2xl border border-danger/30 bg-danger-soft p-4 text-sm text-danger">
+          <p className="font-semibold">{errorBanner}</p>
+          {needsVerification && (
+            <Link to="/verify-email" className="mt-2 inline-block font-bold underline">
+              Ir a verificar mi correo electrónico →
+            </Link>
           )}
-          <span className="flex items-center gap-2.5" aria-current={step.state === 'current' ? 'step' : undefined}>
-            <span
-              className={`flex size-7 shrink-0 items-center justify-center rounded-full text-[14px] font-bold ${
-                step.state === 'done'
-                  ? 'border-2 border-[#087E9A] text-[#087E9A]'
-                  : step.state === 'current'
-                    ? 'bg-[#087E9A] text-white'
-                    : 'bg-[#E1EBEF] text-[#637780]'
-              }`}
-            >
-              {step.state === 'done' ? '✓' : step.id}
-            </span>
-            <span
-              className={`whitespace-nowrap text-[14px] ${
-                step.state === 'current' ? 'inline font-semibold text-[#087E9A]' : 'hidden sm:inline'
-              } ${step.state === 'done' ? 'font-semibold text-[#102F3B]' : ''} ${step.state === 'pending' ? 'font-medium text-[#637780]' : ''}`}
-            >
-              {step.label}
-            </span>
-          </span>
-        </li>
-      ))}
-    </ol>
-  );
-}
+        </div>
+      )}
 
- function Reservation() {
-  const navigate = useNavigate();
-  const routeLocation = useLocation();
-  // La reserva llega desde el detalle de la experiencia; sin ella se usa el ejemplo.
-  const booking = routeLocation.state?.booking ?? defaultBooking;
-  const { experience, people } = booking;
+      <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
+        <form onSubmit={handleSubmit} noValidate className="space-y-6">
+          <section className="space-y-4 rounded-2xl border border-mist bg-surface p-6">
+            <h2 className="text-lg font-bold text-ink">1. Datos de contacto del visitante</h2>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="res-name" className="mb-1 block text-xs font-semibold text-muted">
+                  Nombre completo *
+                </label>
+                <input
+                  id="res-name"
+                  type="text"
+                  required
+                  value={contactName}
+                  onChange={(e) => setContactName(e.target.value)}
+                  className="w-full rounded-xl border border-mist bg-canvas px-3.5 py-2.5 text-sm text-ink"
+                />
+              </div>
+              <div>
+                <label htmlFor="res-email" className="mb-1 block text-xs font-semibold text-muted">
+                  Correo electrónico (para comprobante) *
+                </label>
+                <input
+                  id="res-email"
+                  type="email"
+                  required
+                  value={contactEmail}
+                  onChange={(e) => setContactEmail(e.target.value)}
+                  className="w-full rounded-xl border border-mist bg-canvas px-3.5 py-2.5 text-sm text-ink"
+                />
+              </div>
+            </div>
 
-  const { user } = useAuth();
-  const [contact, setContact] = useState(() => ({
-    name: user?.fullName ?? '',
-    email: user?.email ?? '',
-    phone: '',
-    message: '',
-  }));
-  const [method, setMethod] = useState('card');
-  const [card, setCard] = useState({ number: '', holder: '', expiry: '', cvv: '' });
-  const [accepted, setAccepted] = useState(false);
-  const [errors, setErrors] = useState({});
-
-  const subtotal = experience.price * people;
-  const total = subtotal;
-
-  const updateContact = (field) => (event) => setContact((prev) => ({ ...prev, [field]: event.target.value }));
-  const updateCard = (field, format) => (event) =>
-    setCard((prev) => ({ ...prev, [field]: format ? format(event.target.value) : event.target.value }));
-
-  const validate = () => {
-    const next = {};
-    if (!contact.name.trim()) next.name = 'Escribe tu nombre completo.';
-    if (!/^\S+@\S+\.\S+$/.test(contact.email)) next.email = 'Ingresa un correo válido.';
-    if (onlyDigits(contact.phone).length < 8) next.phone = 'Ingresa un teléfono de al menos 8 dígitos.';
-    if (method === 'card') {
-      if (onlyDigits(card.number).length < 13) next.number = 'Número de tarjeta incompleto.';
-      if (!card.holder.trim()) next.holder = 'Escribe el nombre del titular.';
-      if (onlyDigits(card.expiry).length !== 4) next.expiry = 'Usa el formato MM / AA.';
-      if (onlyDigits(card.cvv).length < 3) next.cvv = 'Código inválido.';
-    }
-    if (!accepted) next.accepted = 'Debes aceptar las condiciones para continuar.';
-    return next;
-  };
-
-  const handleSubmit = (event) => {
-    event.preventDefault();
-    const next = validate();
-    setErrors(next);
-    if (Object.keys(next).length > 0) {
-      const firstId = Object.keys(next)[0];
-      document.getElementById(firstId === 'accepted' ? 'accepted' : `field-${firstId}`)?.focus();
-      return;
-    }
-    // Aún no hay endpoint de reservas: se pasa la información a la confirmación por estado de navegación.
-    navigate('/turista/reservar/confirmacion', {
-      state: { booking: { ...booking, contactName: contact.name, contactEmail: contact.email } },
-    });
-  };
-
-  const borderFor = (key) => (errors[key] ? 'border-[#B42318]' : 'border-[#DFE8EB]');
-  const cardBorderFor = (key) => (errors[key] ? 'border-[#B42318]' : 'border-[#D7E3E8]');
-
-  return (
-    <Container className="flex flex-col gap-6 py-8">
-      <Link to="/turista/explorar" className="text-[13px] text-[#087E9A] hover:underline">
-        ← Volver a la experiencia
-      </Link>
-
-      <StepIndicator />
-
-      <header className="flex flex-col gap-3">
-        <p className="text-[12px] font-bold uppercase leading-[1.45] text-[#087E9A]">Ya casi sientes la brisa</p>
-        <h1 className="text-[26px] font-bold leading-[1.2] text-[#102F3B] sm:text-[30px]">Confirma tu próxima aventura</h1>
-        <p className="text-[16px] leading-[1.45] text-[#637780]">
-          Revisa tu plan, cuéntanos cómo contactarte y elige cómo pagar.
-        </p>
-      </header>
-
-      <form noValidate onSubmit={handleSubmit} className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,480px)]">
-        <div className="flex flex-col gap-6">
-          <section className="flex flex-col gap-4 rounded-xl border border-[#DFE8EB] bg-white p-5">
-            <h2 className="text-[22px] font-bold leading-[1.2] text-[#102F3B] sm:text-2xl">Datos de contacto</h2>
-            <p className="text-[13px] leading-[1.45] text-[#637780]">
-              Aquí recibirás la confirmación y los detalles del encuentro.
-            </p>
-            <Field id="field-name" label="Nombre completo" error={errors.name}>
-              <input id="field-name" autoComplete="name" value={contact.name} onChange={updateContact('name')} placeholder="Escribe tu nombre completo" aria-invalid={Boolean(errors.name)} className={`${inputClass} ${borderFor('name')}`} />
-            </Field>
-            <Field id="field-email" label="Correo electrónico" error={errors.email}>
-              <input id="field-email" type="email" autoComplete="email" value={contact.email} onChange={updateContact('email')} placeholder="nombre@correo.com" aria-invalid={Boolean(errors.email)} className={`${inputClass} ${borderFor('email')}`} />
-            </Field>
-            <Field id="field-phone" label="Teléfono" error={errors.phone}>
-              <input id="field-phone" type="tel" autoComplete="tel" value={contact.phone} onChange={updateContact('phone')} placeholder="+503 7000 0000" aria-invalid={Boolean(errors.phone)} className={`${inputClass} ${borderFor('phone')}`} />
-            </Field>
-            <Field id="field-message" label="Mensaje al operador (opcional)">
-              <textarea id="field-message" rows={4} value={contact.message} onChange={updateContact('message')} placeholder="Es nuestra primera clase de surf. ¡Nos emociona conocer El Tunco!" className={`${inputClass} min-h-[112px] resize-y border-[#DFE8EB]`} />
-            </Field>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="res-phone" className="mb-1 block text-xs font-semibold text-muted">
+                  Teléfono / WhatsApp
+                </label>
+                <input
+                  id="res-phone"
+                  type="tel"
+                  value={contactPhone}
+                  onChange={(e) => setContactPhone(e.target.value)}
+                  placeholder="7000-0000"
+                  className="w-full rounded-xl border border-mist bg-canvas px-3.5 py-2.5 text-sm text-ink"
+                />
+              </div>
+              <div>
+                <label htmlFor="res-notes" className="mb-1 block text-xs font-semibold text-muted">
+                  Notas especiales (alergias, equipo, etc.)
+                </label>
+                <input
+                  id="res-notes"
+                  type="text"
+                  value={specialNotes}
+                  onChange={(e) => setSpecialNotes(e.target.value)}
+                  placeholder="Opcional"
+                  className="w-full rounded-xl border border-mist bg-canvas px-3.5 py-2.5 text-sm text-ink"
+                />
+              </div>
+            </div>
           </section>
 
-          <fieldset className="flex flex-col gap-3.5 rounded-xl border border-[#DFE8EB] bg-white p-5">
-            <legend className="sr-only">Método de pago</legend>
-            <h2 className="text-[22px] font-extrabold leading-[normal] text-[#102F3B]">Método de pago</h2>
-            <p className="text-[13px] text-[#637780]">
-              Elige cómo quieres pagar. Verás solo los datos del método seleccionado.
+          <section className="space-y-4 rounded-2xl border border-mist bg-surface p-6">
+            <h2 className="text-lg font-bold text-ink">2. Pago simulado (Demo)</h2>
+            <p className="text-xs text-muted">
+              Este flujo registra el pago como <strong>PAGADO_DEMO</strong> y envía la notificación por correo sin procesar dinero real ni almacenar datos de tarjeta.
             </p>
 
-            {paymentMethods.map((option) => {
-              const selected = method === option.id;
-              return (
-                <div
-                  key={option.id}
-                  className={`overflow-hidden rounded-[14px] ${selected ? 'border-2 border-[#087E9A] bg-[#EAF6F9]' : 'border border-[#D7E3E8] bg-white'}`}
-                >
-                  <label className="flex cursor-pointer items-center gap-3.5 px-[18px] py-4">
-                    <input type="radio" name="metodo-pago" value={option.id} checked={selected} onChange={() => setMethod(option.id)} className="peer sr-only" />
-                    <span
-                      aria-hidden="true"
-                      className={`flex size-5 shrink-0 items-center justify-center rounded-full peer-focus-visible:ring-2 peer-focus-visible:ring-[#087E9A] ${selected ? 'bg-[#087E9A]' : 'border-[1.5px] border-[#D7E3E8] bg-white'}`}
-                    >
-                      {selected && <span className="size-2 rounded-full bg-white" />}
-                    </span>
-                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <span className="text-[15px] font-bold text-[#102F3B]">{option.title}</span>
-                      <span className="text-[13px] text-[#637780]">{option.description}</span>
-                    </span>
-                    <span className="hidden gap-2 sm:flex">
-                      {option.brands.map((brand) => (
-                        <span key={brand} className="whitespace-nowrap rounded-full border border-[#D7E3E8] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#637780]">
-                          {brand}
-                        </span>
-                      ))}
-                    </span>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => setPaymentMethod('TARJETA_DEMO')}
+                className={`rounded-xl border p-3.5 text-left text-sm font-semibold ${
+                  paymentMethod === 'TARJETA_DEMO'
+                    ? 'border-brand bg-info-soft text-brand'
+                    : 'border-mist bg-canvas text-ink'
+                }`}
+              >
+                Tarjeta de crédito / débito (Demo)
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaymentMethod('TRANSFERENCIA_DEMO')}
+                className={`rounded-xl border p-3.5 text-left text-sm font-semibold ${
+                  paymentMethod === 'TRANSFERENCIA_DEMO'
+                    ? 'border-brand bg-info-soft text-brand'
+                    : 'border-mist bg-canvas text-ink'
+                }`}
+              >
+                Transferencia inmediata (Demo)
+              </button>
+            </div>
+
+            {paymentMethod === 'TARJETA_DEMO' ? (
+              <div className="grid gap-4 pt-2 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <label htmlFor="card-holder" className="mb-1 block text-xs font-semibold text-muted">
+                    Titular de la tarjeta
                   </label>
-
-                  {option.id === 'card' && selected && (
-                    <div className="px-[18px] pb-[18px]">
-                      <div className="flex flex-col gap-3.5 rounded-xl border border-[#D7E3E8] bg-white p-4">
-                        <Field small id="field-number" label="Número de tarjeta" error={errors.number}>
-                          <input id="field-number" inputMode="numeric" autoComplete="cc-number" value={card.number} onChange={updateCard('number', formatCardNumber)} placeholder="4242 4242 4242 4242" className={`${cardInputClass} ${cardBorderFor('number')}`} />
-                        </Field>
-                        <Field small id="field-holder" label="Nombre del titular" error={errors.holder}>
-                          <input id="field-holder" autoComplete="cc-name" value={card.holder} onChange={updateCard('holder')} placeholder="ANA LÓPEZ" className={`${cardInputClass} uppercase ${cardBorderFor('holder')}`} />
-                        </Field>
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          <Field small id="field-expiry" label="Vencimiento" error={errors.expiry}>
-                            <input id="field-expiry" inputMode="numeric" autoComplete="cc-exp" value={card.expiry} onChange={updateCard('expiry', formatExpiry)} placeholder="MM / AA" className={`${cardInputClass} ${cardBorderFor('expiry')}`} />
-                          </Field>
-                          <Field small id="field-cvv" label="Código de seguridad (CVV)" error={errors.cvv}>
-                            <input id="field-cvv" inputMode="numeric" autoComplete="cc-csc" maxLength={4} value={card.cvv} onChange={updateCard('cvv', (v) => onlyDigits(v).slice(0, 4))} placeholder="123" className={`${cardInputClass} ${cardBorderFor('cvv')}`} />
-                          </Field>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                  <input
+                    id="card-holder"
+                    type="text"
+                    value={cardHolder}
+                    onChange={(e) => setCardHolder(e.target.value)}
+                    className="w-full rounded-xl border border-mist bg-canvas px-3.5 py-2.5 text-sm text-ink"
+                  />
                 </div>
-              );
-            })}
-          </fieldset>
-        </div>
+                <div className="sm:col-span-2">
+                  <label htmlFor="card-number" className="mb-1 block text-xs font-semibold text-muted">
+                    Número de tarjeta simulado
+                  </label>
+                  <input
+                    id="card-number"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="4242 4242 4242 4242"
+                    value={cardNumber}
+                    onChange={(e) => setCardNumber(e.target.value)}
+                    className="w-full rounded-xl border border-mist bg-canvas px-3.5 py-2.5 text-sm text-ink"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="card-expiry" className="mb-1 block text-xs font-semibold text-muted">
+                    Vencimiento (MM/AA)
+                  </label>
+                  <input
+                    id="card-expiry"
+                    type="text"
+                    placeholder="12/28"
+                    value={cardExpiry}
+                    onChange={(e) => setCardExpiry(e.target.value)}
+                    className="w-full rounded-xl border border-mist bg-canvas px-3.5 py-2.5 text-sm text-ink"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="card-cvv" className="mb-1 block text-xs font-semibold text-muted">
+                    CVV
+                  </label>
+                  <input
+                    id="card-cvv"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="123"
+                    value={cardCvv}
+                    onChange={(e) => setCardCvv(e.target.value)}
+                    className="w-full rounded-xl border border-mist bg-canvas px-3.5 py-2.5 text-sm text-ink"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-mist bg-canvas p-4 text-xs text-muted">
+                Al confirmar, el sistema simulará la validación instantánea de la transferencia y emitirá tu comprobante por correo electrónico.
+              </div>
+            )}
+          </section>
 
-        <aside className="flex flex-col gap-4 rounded-xl border border-[#DFE8EB] bg-white p-5 lg:sticky lg:top-6">
-          <img src={experience.image} alt="" className="h-[210px] w-full rounded-xl object-cover" />
-          <h2 className="text-[23px] font-bold leading-[1.2] text-[#102F3B]">{experience.title}</h2>
-          <p className="text-[13px] leading-[1.45] text-[#637780]">
-            {experience.location} · ★ {experience.rating.toFixed(1)} ({experience.reviews} reseñas)
-          </p>
-          <hr className="border-[#DFE8EB]" />
-          <div className="flex flex-col gap-3 text-[14px] leading-[1.45] text-[#102F3B]">
-            <p className="font-semibold">Tu plan</p>
-            <p>{booking.date}</p>
-            <p>
-              {booking.time} · {people} personas
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full rounded-full bg-brand px-6 py-3.5 text-sm font-bold text-white transition hover:bg-brand-dark disabled:opacity-50"
+          >
+            {submitting
+              ? 'Procesando reserva y pago demo...'
+              : `Confirmar y pagar ${formatCurrency(totalAmount, experience.currency)} (Demo)`}
+          </button>
+        </form>
+
+        <aside className="h-fit space-y-4 rounded-2xl border border-mist bg-surface p-6">
+          <img
+            src={coverUrl}
+            alt={experience.title}
+            className="aspect-[16/10] w-full rounded-xl object-cover"
+          />
+          <div>
+            <p className="text-xs font-semibold uppercase text-brand">Resumen de tu reserva</p>
+            <h2 className="mt-1 text-lg font-bold text-ink">{experience.title}</h2>
+            <p className="text-xs text-muted">
+              {experience.municipalityName}, {experience.departmentName}
             </p>
-            <p className="text-[13px] text-[#637780]">Operador: {experience.operator}</p>
           </div>
-          <hr className="border-[#DFE8EB]" />
-          <dl className="flex flex-col gap-4 text-[14px] text-[#102F3B]">
-            <div className="flex justify-between gap-4">
-              <dt>
-                {formatUsd(experience.price)} × {people} personas
-              </dt>
-              <dd>{formatUsd(subtotal)}</dd>
+
+          <dl className="space-y-2 border-t border-mist pt-4 text-sm">
+            <div className="flex justify-between">
+              <dt className="text-muted">Fecha</dt>
+              <dd className="font-semibold text-ink">{formatDateReadable(availability.date)}</dd>
             </div>
-            <div className="flex justify-between gap-4">
-              <dt>Cargo por servicio</dt>
-              <dd>{formatUsd(0)}</dd>
+            <div className="flex justify-between">
+              <dt className="text-muted">Horario</dt>
+              <dd className="font-semibold text-ink">
+                {availability.startTime}
+                {availability.endTime ? ` – ${availability.endTime}` : ''}
+              </dd>
             </div>
-            <hr className="border-[#DFE8EB]" />
-            <div className="flex justify-between gap-4 text-[21px] font-bold leading-[1.2]">
+            <div className="flex justify-between">
+              <dt className="text-muted">Cupos</dt>
+              <dd className="font-semibold text-ink">
+                {peopleCount} {peopleCount === 1 ? 'persona' : 'personas'}
+              </dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-muted">Precio unitario congelado</dt>
+              <dd className="font-semibold text-ink">
+                {formatCurrency(unitPrice, experience.currency)}
+              </dd>
+            </div>
+            <div className="flex justify-between border-t border-mist pt-3 text-base font-bold text-ink">
               <dt>Total</dt>
-              <dd>{formatUsd(total)} USD</dd>
+              <dd>{formatCurrency(totalAmount, experience.currency)}</dd>
             </div>
           </dl>
-          <div className="flex flex-col gap-3 border-t border-[#D7E3E8] pt-4">
-            <h3 className="text-[16px] font-bold leading-[1.2] text-[#102F3B]">Reserva con tranquilidad</h3>
-            <p className="text-[14px] leading-[1.45] text-[#637780]">
-              Cancelación gratuita hasta el {booking.freeCancelUntil}. Después de ese momento, consulta las condiciones con el operador.
-            </p>
-            <label className="flex items-start gap-2 text-[14px] leading-[1.45] text-[#102F3B]">
-              <input id="accepted" type="checkbox" checked={accepted} onChange={(event) => setAccepted(event.target.checked)} className="mt-1 size-4 accent-[#087E9A]" />
-              <span>Acepto las condiciones de la experiencia y los Términos de RutaSV.</span>
-            </label>
-            {errors.accepted && (
-              <p role="alert" className="text-[12px] font-medium text-[#B42318]">
-                {errors.accepted}
-              </p>
-            )}
-            <button type="submit" className="min-h-[50px] w-full rounded-xl bg-[#087E9A] px-3 py-2.5 text-[15px] font-semibold text-white hover:bg-cyan-800">
-              Pagar y confirmar reserva
-            </button>
+
+          <div className="rounded-xl bg-info-soft p-3.5 text-xs leading-relaxed text-ink">
+            <strong>Reglas de cancelación (hora El Salvador):</strong>
+            <ul className="mt-1 list-disc pl-4 text-muted">
+              <li>≥ 48 h antes: reembolso del 100 %.</li>
+              <li>24 h a 48 h antes: reembolso del 50 %.</li>
+              <li>&lt; 24 h antes: sin reembolso (cupos liberados).</li>
+            </ul>
           </div>
-          <p className="text-[11px] leading-[1.45] text-[#637780]">Referencia: {booking.reference}</p>
         </aside>
-      </form>
-    </Container>
-  );
+      </div>
+    </div>
+  )
 }
+
 export default Reservation

@@ -1,0 +1,12 @@
+{
+  "sub": "ec25601c-d3fb-41ff-a022-2b143afade36",
+  "email": "evervc.dev@gmail.com",
+  "given_name": "Ever",
+  "family_name": "Vásquez",
+  "http://schemas.microsoft.com/ws/2008/06/identity/claims/role": "VISITANTE",
+  "email_verified": "true",
+  "jti": "e1b6e42e-3ba3-4218-a547-010638b0d2f5",
+  "exp": 1793242235,
+  "iss": "RutaSV.Api",
+  "aud": "RutaSV.Client"
+}

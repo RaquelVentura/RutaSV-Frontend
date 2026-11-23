@@ -29,7 +29,11 @@ export function getUserMenuLabel(user) {
 }
 
 export function getUserMenuItems(user) {
-  const items = [{ to: '/perfil', label: 'Mi perfil' }]
+  const items = [
+    { to: '/perfil', label: 'Mi perfil' },
+    { to: '/turista/mi-actividad/reservas', label: 'Mis reservas' },
+    { to: '/turista/mi-actividad/favoritos', label: 'Favoritos' },
+  ]
 
   if (user?.role === Roles.OPERADOR) {
     items.push(

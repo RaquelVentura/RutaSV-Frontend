@@ -1,9 +1,16 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import api from '../../config/axios.js'
 import { AuthContext } from '../../context/AuthContext.jsx'
 import CompanyProfile from '../Companies/CompanyProfile.jsx'
 import OperatorsList from './OperatorsList.jsx'
+
+vi.mock('../../config/axios.js', () => ({
+  default: {
+    get: vi.fn(),
+  },
+}))
 
 function Where() {
   const { pathname, search, hash } = useLocation()
@@ -25,25 +32,42 @@ function renderList() {
   )
 }
 
+beforeEach(() => {
+  vi.clearAllMocks()
+  api.get.mockImplementation((url) => {
+    if (url.includes('olas-de-el-tunco')) {
+      return Promise.resolve({
+        data: { id: 'c1', tradeName: 'Olas de El Tunco', experiences: [] },
+      })
+    }
+    if (url.includes('raices-de-cafe')) {
+      return Promise.resolve({
+        data: { id: 'c2', tradeName: 'Raíces de Café', experiences: [] },
+      })
+    }
+    return Promise.resolve({ data: { id: 'c0', tradeName: 'Empresa', experiences: [] } })
+  })
+})
+
 afterEach(cleanup)
 
 describe('Operadores (admin)', () => {
-  it('«Ver perfil» abre el perfil público de la empresa', () => {
+  it('«Ver perfil» abre el perfil público de la empresa', async () => {
     renderList()
 
     fireEvent.click(screen.getByRole('link', { name: 'Ver perfil de Olas de El Tunco' }))
 
     expect(screen.getByTestId('ruta')).toHaveTextContent('/empresas/olas-de-el-tunco')
-    expect(screen.getByRole('heading', { level: 1, name: 'Olas de El Tunco' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Olas de El Tunco' })).toBeInTheDocument()
   })
 
-  it('«Ver experiencias» abre el perfil en la sección de experiencias', () => {
+  it('«Ver experiencias» abre el perfil en la sección de experiencias', async () => {
     renderList()
 
     fireEvent.click(screen.getByRole('link', { name: 'Ver experiencias de Raíces de Café' }))
 
     expect(screen.getByTestId('ruta')).toHaveTextContent('/empresas/raices-de-cafe#experiencias')
-    expect(screen.getByRole('region', { name: 'Experiencias de Raíces de Café' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Raíces de Café' })).toBeInTheDocument()
   })
 
   it('cada operador con perfil público tiene su página', () => {

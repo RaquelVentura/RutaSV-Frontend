@@ -1,137 +1,123 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import api from '../../config/axios.js'
+import { AuthContext } from '../../context/AuthContext.jsx'
 import ExperienceExplorer from './ExperienceExplorer.jsx'
 
-function renderExplorer(path = '/experiencias') {
+vi.mock('../../config/axios.js', () => ({
+  default: {
+    get: vi.fn(),
+    post: vi.fn(),
+    delete: vi.fn(),
+  },
+}))
+
+const sampleExperiences = [
+  {
+    id: 'exp-1',
+    slug: 'surf-el-tunco',
+    title: 'Surf al atardecer en El Tunco',
+    shortDescription: 'Aprende surf con instructores locales.',
+    municipalityName: 'Tamanique',
+    departmentName: 'La Libertad',
+    latitude: 13.4926,
+    longitude: -89.3831,
+    durationMinutes: 120,
+    price: 45,
+    averageRating: 4.9,
+    hasLimitedCapacity: true,
+    maxPeople: 6,
+    coverImageUrl: 'https://example.com/surf.jpg',
+  },
+]
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  api.get.mockImplementation((url) => {
+    if (url === '/categories') {
+      return Promise.resolve({ data: [{ id: 1, name: 'Playa' }, { id: 3, name: 'Surf' }] })
+    }
+    if (url === '/departments') {
+      return Promise.resolve({ data: [{ id: 5, name: 'La Libertad' }] })
+    }
+    if (url === '/favorites/ids') {
+      return Promise.resolve({ data: [] })
+    }
+    if (url === '/experiences') {
+      return Promise.resolve({
+        data: {
+          data: sampleExperiences,
+          totalRecords: 1,
+          totalPages: 1,
+          currentPage: 1,
+          pageSize: 9,
+        },
+      })
+    }
+    return Promise.resolve({ data: [] })
+  })
+})
+
+afterEach(cleanup)
+
+function renderExplorer(path = '/experiencias', isAuthenticated = true) {
   return render(
-    <MemoryRouter initialEntries={[path]}>
-      <Routes>
-        <Route path="/experiencias" element={<ExperienceExplorer today={new Date(2026, 10, 4)} />} />
-      </Routes>
-    </MemoryRouter>,
+    <AuthContext.Provider value={{ user: isAuthenticated ? { id: 'u1', role: 'VISITANTE' } : null, isAuthenticated }}>
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route path="/experiencias" element={<ExperienceExplorer />} />
+        </Routes>
+      </MemoryRouter>
+    </AuthContext.Provider>,
   )
 }
 
-const cards = () => screen.getAllByRole('heading', { level: 3 })
-
-beforeEach(() => {
-  vi.useFakeTimers({ toFake: ['Date'] })
-  vi.setSystemTime(new Date(2026, 10, 4, 9, 0, 0))
-})
-
-afterEach(() => {
-  cleanup()
-  vi.useRealTimers()
-})
-
-describe('Explorar experiencias', () => {
-  it('lista el catálogo con paginación de 6 en 6', () => {
+describe('Explorar experiencias (integrado con Backend)', () => {
+  it('carga catálogo, categorías y departamentos desde el backend', async () => {
     renderExplorer()
 
-    expect(screen.getByRole('heading', { level: 1, name: /sal de la rutina/i })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: /13 experiencias para descubrir/ })).toBeInTheDocument()
-    expect(cards()).toHaveLength(6)
-
-    fireEvent.click(screen.getByRole('button', { name: 'Página 3' }))
-    expect(cards()).toHaveLength(1)
-    expect(screen.getByRole('button', { name: 'Siguiente →' })).toBeDisabled()
+    expect(await screen.findByText('Surf al atardecer en El Tunco')).toBeInTheDocument()
+    expect(screen.getByText('1 experiencia disponible')).toBeInTheDocument()
   })
 
-  it('filtra por categoría y departamento al aplicar los filtros', () => {
+  it('envía filtros y ordenamiento a GET /experiences', async () => {
     renderExplorer()
-    const filters = screen.getByRole('form', { name: 'Filtros' })
+    await screen.findByText('Surf al atardecer en El Tunco')
 
-    fireEvent.click(within(filters).getByLabelText('Café y naturaleza'))
-    fireEvent.click(within(filters).getByLabelText('Sonsonate'))
-    fireEvent.click(within(filters).getByRole('button', { name: 'Aplicar filtros' }))
+    fireEvent.change(screen.getByLabelText('Ordenar experiencias'), {
+      target: { value: 'price_asc' },
+    })
 
-    expect(screen.getByRole('heading', { name: /2 experiencias para descubrir/ })).toBeInTheDocument()
-    expect(screen.getByText('Cata de café en una finca de Juayúa')).toBeInTheDocument()
-    expect(screen.getByText('Ruta del cacao en Izalco')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith(
+        '/experiences',
+        expect.objectContaining({
+          params: expect.objectContaining({ sortBy: 'price_asc' }),
+        }),
+      )
+    })
   })
 
-  it('filtra por rango de precio', () => {
+  it('permite agregar y quitar de favoritos desde la tarjeta', async () => {
+    api.post.mockResolvedValueOnce({ status: 204 })
+    api.delete.mockResolvedValueOnce({ status: 204 })
+
     renderExplorer()
-    const filters = screen.getByRole('form', { name: 'Filtros' })
+    await screen.findByText('Surf al atardecer en El Tunco')
 
-    fireEvent.change(within(filters).getByLabelText('Hasta'), { target: { value: '25' } })
-    fireEvent.click(within(filters).getByRole('button', { name: 'Aplicar filtros' }))
+    const favButton = screen.getByRole('button', { name: 'Agregar a favoritos' })
+    fireEvent.click(favButton)
 
-    const titles = cards().map((heading) => heading.textContent)
-    expect(titles).toEqual(
-      expect.arrayContaining(['Yoga al amanecer en El Sunzal', 'Sabores de la feria gastronómica de Juayúa']),
-    )
-    expect(titles).not.toContain('Surf al atardecer en El Tunco')
-  })
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith('/favorites/exp-1')
+    })
 
-  it('la barra de precio y los campos se mantienen sincronizados', () => {
-    renderExplorer()
-    const filters = screen.getByRole('form', { name: 'Filtros' })
+    const removeFavButton = await screen.findByRole('button', { name: 'Quitar de favoritos' })
+    fireEvent.click(removeFavButton)
 
-    expect(within(filters).getByText('$0 – $100+')).toBeInTheDocument()
-
-    fireEvent.change(within(filters).getByLabelText('Precio máximo, barra'), { target: { value: '30' } })
-    expect(within(filters).getByLabelText('Hasta')).toHaveValue(30)
-    expect(within(filters).getByText('$0 – $30')).toBeInTheDocument()
-
-    fireEvent.change(within(filters).getByLabelText('Desde'), { target: { value: '20' } })
-    expect(within(filters).getByLabelText('Precio mínimo, barra')).toHaveValue('20')
-
-    // La barra no deja que el mínimo pase al máximo.
-    fireEvent.change(within(filters).getByLabelText('Precio mínimo, barra'), { target: { value: '60' } })
-    expect(within(filters).getByLabelText('Desde')).toHaveValue(30)
-
-    fireEvent.click(within(filters).getByRole('button', { name: 'Aplicar filtros' }))
-    const prices = screen.getAllByText(/^\$\d+ USD$/).map((node) => Number(node.textContent.match(/\d+/)[0]))
-    expect(prices.length).toBeGreaterThan(0)
-    expect(prices.every((price) => price === 30)).toBe(true)
-  })
-
-  it('ordena por precio de menor a mayor', () => {
-    renderExplorer()
-
-    fireEvent.change(screen.getByLabelText('Ordenar por'), { target: { value: 'precio-asc' } })
-
-    expect(cards()[0]).toHaveTextContent('Centro histórico de San Salvador a pie')
-  })
-
-  it('excluye las experiencias cerradas en la fecha elegida (lunes)', () => {
-    renderExplorer()
-
-    fireEvent.change(screen.getByLabelText('Fecha'), { target: { value: '2026-11-09' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Actualizar búsqueda' }))
-
-    expect(screen.getByRole('status')).toHaveTextContent(/no encontramos experiencias/i)
-  })
-
-  it('busca por texto con el parámetro q del encabezado', () => {
-    renderExplorer('/experiencias?q=cacao')
-
-    expect(screen.getByText('Resultados para «cacao».')).toBeInTheDocument()
-    expect(cards()).toHaveLength(1)
-    expect(cards()[0]).toHaveTextContent('Ruta del cacao en Izalco')
-  })
-
-  it('cambia entre la vista en lista y en mapa', () => {
-    renderExplorer()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Vista en mapa' }))
-    expect(screen.getByRole('img', { name: /mapa ilustrativo/i })).toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Vista en lista' }))
-    expect(cards()).toHaveLength(6)
-  })
-
-  it('limpia los filtros', () => {
-    renderExplorer()
-    const filters = screen.getByRole('form', { name: 'Filtros' })
-
-    fireEvent.click(within(filters).getByLabelText('Surf y playa'))
-    fireEvent.click(within(filters).getByRole('button', { name: 'Aplicar filtros' }))
-    expect(screen.getByRole('heading', { name: /4 experiencias para descubrir/ })).toBeInTheDocument()
-
-    fireEvent.click(within(filters).getByRole('button', { name: 'Limpiar' }))
-    expect(screen.getByRole('heading', { name: /13 experiencias para descubrir/ })).toBeInTheDocument()
+    await waitFor(() => {
+      expect(api.delete).toHaveBeenCalledWith('/favorites/exp-1')
+    })
   })
 })

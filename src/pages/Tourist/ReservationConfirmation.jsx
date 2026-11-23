@@ -1,103 +1,153 @@
-import { Link, useLocation } from 'react-router-dom';
-import Container from '../../components/turista/Container.jsx';
-import { assets, defaultBooking, formatUsd } from '../../data/turista';
+import { useEffect, useState } from 'react'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
+import Pill from '../../components/admin/Pill.jsx'
+import { getReservationById } from '../../lib/bookingApi.js'
+import { extractApiError } from '../../lib/catalogApi.js'
+import {
+  formatCurrency,
+  formatDateReadable,
+  paymentStatusMeta,
+  reservationStatusMeta,
+} from '../../lib/formatters.js'
 
-export default function ReservaConfirmacion() {
-  const { state } = useLocation();
-  const booking = state?.booking ?? defaultBooking;
-  const { experience, people } = booking;
-  const firstName = booking.contactName.split(' ')[0];
-  const total = experience.price * people;
+function ReservationConfirmation() {
+  const location = useLocation()
+  const [searchParams] = useSearchParams()
+  const stateReservation = location.state?.reservation || null
+  const reservationId = searchParams.get('id') || stateReservation?.id || ''
 
-  const nextSteps = [
-    {
-      icon: assets.mail,
-      title: 'Guarda tu confirmación',
-      text: `Correo de referencia: ${booking.contactEmail}.`,
-    },
-    {
-      icon: assets.mapPin,
-      title: 'Nos vemos en la playa',
-      text: `${experience.operator} · Acceso principal. Llega a las 14:45 con tu código de reserva.`,
-    },
-    {
-      icon: assets.backpack,
-      title: 'Prepara lo esencial',
-      text: 'Traje de baño, toalla y protector solar. Nosotros ponemos la tabla y las ganas.',
-    },
-  ];
+  const [reservation, setReservation] = useState(stateReservation)
+  const [loading, setLoading] = useState(!stateReservation && Boolean(reservationId))
+  const [errorMessage, setErrorMessage] = useState('')
+
+  useEffect(() => {
+    if (stateReservation || !reservationId) return
+    let cancelled = false
+    getReservationById(reservationId)
+      .then((data) => {
+        if (!cancelled) setReservation(data)
+      })
+      .catch((err) => {
+        if (!cancelled) setErrorMessage(extractApiError(err, 'No se pudo cargar la reserva.').message)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [reservationId, stateReservation])
+
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-3xl px-6 py-16">
+        <div className="h-64 animate-pulse rounded-2xl bg-surface" />
+      </div>
+    )
+  }
+
+  if (!reservation) {
+    return (
+      <div className="mx-auto max-w-3xl px-6 py-16 text-center">
+        <h1 className="text-3xl font-bold text-ink">Comprobante no disponible</h1>
+        <p className="mt-2 text-sm text-muted">
+          {errorMessage || 'Puedes revisar todas tus reservas desde tu historial.'}
+        </p>
+        <Link
+          to="/turista/mi-actividad/reservas"
+          className="mt-6 inline-block rounded-full bg-brand px-6 py-3 text-sm font-semibold text-white"
+        >
+          Ir a Mis reservas
+        </Link>
+      </div>
+    )
+  }
+
+  const statusInfo = reservationStatusMeta[reservation.status] ?? {
+    label: reservation.status,
+    tone: 'neutral',
+  }
+  const paymentInfo = paymentStatusMeta[reservation.paymentStatus] ?? {
+    label: reservation.paymentStatus,
+    tone: 'neutral',
+  }
 
   return (
-    <Container className="py-10 sm:py-12">
-      <div className="mx-auto flex max-w-[960px] flex-col gap-6">
-        <header className="flex flex-col items-center gap-3 text-center">
-          <span className="flex size-16 items-center justify-center rounded-full bg-[#EDF5EF]">
-            <img src={assets.check} alt="" className="size-8" />
+    <div className="mx-auto max-w-3xl space-y-6 px-6 py-10">
+      <div className="rounded-3xl border border-mist bg-surface p-8 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3.5 py-1 text-xs font-bold text-emerald-700">
+            ✓ Reserva registrada
           </span>
-          <span className="rounded-full bg-[#EDF5EF] px-2.5 py-1.5 text-[12px] font-semibold text-[#28634D]">
-            Reserva confirmada
-          </span>
-          <h1 className="text-[28px] font-bold leading-[1.2] text-[#102F3B] sm:text-[38px]">
-            ¡Tu próxima historia ya tiene fecha!
-          </h1>
-          <p className="text-[16px] leading-[1.45] text-[#637780]">
-            {firstName}, tu plan en El Tunco está listo. Guarda estos detalles para tu viaje.
-          </p>
-        </header>
-
-        <section className="flex flex-col gap-6 rounded-xl border border-[#DFE8EB] bg-white p-5 sm:p-7">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-col gap-1.5">
-              <p className="text-[12px] leading-[1.45] text-[#637780]">CÓDIGO DE RESERVA</p>
-              <p className="break-all text-[22px] font-bold leading-[1.45] text-[#087E9A] sm:text-[25px]">{booking.reference}</p>
-            </div>
-            <span className="self-start rounded-full bg-[#EDF5EF] px-2.5 py-1.5 text-[12px] font-semibold text-[#28634D] sm:self-auto">
-              Activa · Confirmada
-            </span>
+          <div className="flex gap-2">
+            <Pill tone={statusInfo.tone}>{statusInfo.label}</Pill>
+            <Pill tone={paymentInfo.tone}>{paymentInfo.label}</Pill>
           </div>
-          <hr className="border-[#DFE8EB]" />
-          <div className="flex flex-col gap-5 sm:flex-row sm:gap-7">
-            <img src={experience.image} alt="" className="h-[215px] w-full rounded-xl object-cover sm:w-[290px] sm:shrink-0" />
-            <div className="flex flex-col gap-3 leading-[1.45]">
-              <h2 className="text-[22px] font-bold text-[#102F3B] sm:text-[25px]">{experience.title}</h2>
-              <p className="text-[14px] text-[#637780]">
-                {experience.location} · {experience.operator}
-              </p>
-              <p className="text-[15px] text-[#102F3B]">{booking.date}</p>
-              <p className="text-[15px] text-[#102F3B]">
-                {booking.time} · {people} personas
-              </p>
-              <p className="text-[18px] font-bold text-[#102F3B]">Total: {formatUsd(total)} USD</p>
-            </div>
+        </div>
+
+        <h1 className="mt-4 text-3xl font-bold text-ink">
+          ¡Todo listo para {reservation.experienceTitle}!
+        </h1>
+        <p className="mt-2 text-sm text-muted">
+          Enviamos la confirmación y los detalles al correo{' '}
+          <strong className="text-ink">{reservation.contactEmail || 'registrado en tu cuenta'}</strong>.
+          {reservation.status === 'PENDIENTE'
+            ? ' El operador revisará y confirmará tu reserva pronto.'
+            : ' Tu reserva quedó confirmada de inmediato.'}
+        </p>
+
+        <dl className="mt-6 grid gap-4 rounded-2xl border border-mist bg-canvas p-5 text-sm sm:grid-cols-2">
+          <div>
+            <dt className="text-xs font-semibold uppercase text-muted">Código de reserva</dt>
+            <dd className="mt-1 font-mono text-base font-bold text-brand">
+              {reservation.reservationCode}
+            </dd>
           </div>
-        </section>
+          <div>
+            <dt className="text-xs font-semibold uppercase text-muted">Referencia de pago demo</dt>
+            <dd className="mt-1 font-mono text-xs font-semibold text-ink">
+              {reservation.paymentReference || 'PAGADO_DEMO'}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs font-semibold uppercase text-muted">Fecha y hora</dt>
+            <dd className="mt-1 font-semibold text-ink">
+              {formatDateReadable(reservation.activityDate)} · {reservation.startTime}
+              {reservation.endTime ? ` – ${reservation.endTime}` : ''}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs font-semibold uppercase text-muted">Personas y total</dt>
+            <dd className="mt-1 font-semibold text-ink">
+              {reservation.peopleCount} {reservation.peopleCount === 1 ? 'persona' : 'personas'} ·{' '}
+              {formatCurrency(reservation.total, reservation.currency)}
+            </dd>
+          </div>
+          {reservation.locationLabel && (
+            <div className="sm:col-span-2">
+              <dt className="text-xs font-semibold uppercase text-muted">Ubicación</dt>
+              <dd className="mt-1 font-semibold text-ink">{reservation.locationLabel}</dd>
+            </div>
+          )}
+        </dl>
 
-        <section className="flex flex-col gap-5 rounded-xl bg-[#E9F5F7] p-5 sm:p-7">
-          <h2 className="text-[22px] font-bold leading-[1.45] text-[#102F3B] sm:text-2xl">Ahora, solo queda disfrutar</h2>
-          <ul className="grid gap-6 md:grid-cols-3 md:gap-7">
-            {nextSteps.map((step) => (
-              <li key={step.title} className="flex flex-col gap-2.5">
-                <img src={step.icon} alt="" className="size-6" />
-                <p className="text-[16px] font-bold leading-[1.45] text-[#102F3B]">{step.title}</p>
-                <p className="text-[13px] leading-[1.45] text-[#637780]">{step.text}</p>
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        <div className="flex flex-col justify-center gap-4 sm:flex-row">
-          <Link to="/turista/mi-actividad/reservas" className="inline-flex h-[50px] items-center justify-center rounded-xl border border-[#087E9A] bg-[#087E9A] px-5 text-[15px] font-semibold text-white hover:bg-cyan-800">
-            Ver Mis Reservas
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Link
+            to="/turista/mi-actividad/reservas"
+            className="rounded-full bg-brand px-6 py-3 text-sm font-bold text-white hover:bg-brand-dark"
+          >
+            Ver mi historial de reservas
           </Link>
-          <Link to="/turista/explorar" className="inline-flex h-[50px] items-center justify-center rounded-xl border border-[#DFE8EB] bg-white px-5 text-[15px] font-semibold text-[#102F3B] hover:bg-[#F8FAFC]">
+          <Link
+            to="/experiencias"
+            className="rounded-full border border-mist bg-surface px-6 py-3 text-sm font-semibold text-ink hover:border-brand"
+          >
             Seguir explorando
           </Link>
         </div>
-
-        <p className="text-center text-[12px] leading-[1.45] text-[#637780]">
-          ¿Necesitas ayuda? Contacta a {experience.operator} · {booking.operatorPhone}
-        </p>
       </div>
-    </Container>
-  );
+    </div>
+  )
 }
+
+export default ReservationConfirmation
