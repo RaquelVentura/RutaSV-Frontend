@@ -159,7 +159,7 @@ function ExperienceDetail() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-6xl space-y-6 px-6 py-10">
+      <div className="w-full space-y-6 px-6 py-10">
         <div className="h-10 w-2/3 animate-pulse rounded-xl bg-surface" />
         <div className="h-96 animate-pulse rounded-2xl bg-surface" />
       </div>
@@ -196,7 +196,7 @@ function ExperienceDetail() {
   const openSlots = availabilities.filter((s) => s.status === 'ABIERTA' && s.availableSpots > 0)
 
   return (
-    <div className="mx-auto max-w-6xl space-y-10 px-6 py-8">
+    <div className="w-full space-y-10 px-6 py-8">
       <nav aria-label="Migas de pan" className="text-xs text-muted">
         <Link to="/" className="hover:text-brand">Inicio</Link>
         {' / '}

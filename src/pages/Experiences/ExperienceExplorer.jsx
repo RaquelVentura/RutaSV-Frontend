@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import FilterSelect from '../../components/admin/FilterSelect.jsx'
+import PriceRange from '../../components/PriceRange.jsx'
 import ExperienceCard from '../../components/ExperienceCard.jsx'
 import LeafletMap from '../../components/map/LeafletMap.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
@@ -148,7 +150,7 @@ function ExperienceExplorer() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-8 px-6 py-8">
+    <div className="w-full space-y-8 px-6 py-8">
       <header className="space-y-3">
         <p className="text-xs font-bold uppercase tracking-wide text-brand">
           Explora El Salvador
@@ -241,108 +243,60 @@ function ExperienceExplorer() {
           </div>
 
           <div>
-            <label htmlFor="explorer-category" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted">
-              Categoría
-            </label>
-            <select
-              id="explorer-category"
+            <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">Categoría</p>
+            <FilterSelect
+              label="Categoría"
+              wrapperClassName="block"
               value={categoryId}
               onChange={(e) => {
                 setCategoryId(e.target.value)
                 setPageNumber(1)
               }}
-              className="w-full rounded-xl border border-mist bg-canvas px-3 py-2 text-sm text-ink"
-            >
-              <option value="">Todas las categorías</option>
-              {categories.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.name}
-                </option>
-              ))}
-            </select>
+              options={[{ value: '', label: 'Todas las categorías' }, ...categories.map((cat) => ({ value: cat.id, label: cat.name }))]}
+            />
           </div>
 
           <div>
-            <label htmlFor="explorer-department" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted">
-              Departamento
-            </label>
-            <select
-              id="explorer-department"
+            <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">Departamento</p>
+            <FilterSelect
+              label="Departamento"
+              wrapperClassName="block"
               value={departmentId}
               onChange={(e) => {
                 setDepartmentId(e.target.value)
                 setPageNumber(1)
               }}
-              className="w-full rounded-xl border border-mist bg-canvas px-3 py-2 text-sm text-ink"
-            >
-              <option value="">Todo El Salvador</option>
-              {departments.map((dept) => (
-                <option key={dept.id} value={dept.id}>
-                  {dept.name}
-                </option>
-              ))}
-            </select>
+              options={[{ value: '', label: 'Todo El Salvador' }, ...departments.map((dept) => ({ value: dept.id, label: dept.name }))]}
+            />
           </div>
 
           <div>
-            <label htmlFor="explorer-difficulty" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted">
-              Dificultad
-            </label>
-            <select
-              id="explorer-difficulty"
+            <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">Dificultad</p>
+            <FilterSelect
+              label="Dificultad"
+              wrapperClassName="block"
               value={difficulty}
               onChange={(e) => {
                 setDifficulty(e.target.value)
                 setPageNumber(1)
               }}
-              className="w-full rounded-xl border border-mist bg-canvas px-3 py-2 text-sm text-ink"
-            >
-              <option value="">Cualquier nivel</option>
-              {Object.entries(difficultyLabels).map(([key, label]) => (
-                <option key={key} value={key}>
-                  {label}
-                </option>
-              ))}
-            </select>
+              options={[{ value: '', label: 'Cualquier nivel' }, ...Object.entries(difficultyLabels).map(([key, label]) => ({ value: key, label }))]}
+            />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="explorer-min-price" className="mb-1 block text-xs font-semibold text-muted">
-                Precio mín.
-              </label>
-              <input
-                id="explorer-min-price"
-                type="number"
-                min="0"
-                step="1"
-                value={minPrice}
-                onChange={(e) => {
-                  setMinPrice(e.target.value)
-                  setPageNumber(1)
-                }}
-                placeholder="$0"
-                className="w-full rounded-xl border border-mist bg-canvas px-3 py-2 text-sm text-ink"
-              />
-            </div>
-            <div>
-              <label htmlFor="explorer-max-price" className="mb-1 block text-xs font-semibold text-muted">
-                Precio máx.
-              </label>
-              <input
-                id="explorer-max-price"
-                type="number"
-                min="0"
-                step="1"
-                value={maxPrice}
-                onChange={(e) => {
-                  setMaxPrice(e.target.value)
-                  setPageNumber(1)
-                }}
-                placeholder="$250"
-                className="w-full rounded-xl border border-mist bg-canvas px-3 py-2 text-sm text-ink"
-              />
-            </div>
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Precio</p>
+            <PriceRange
+              min={0}
+              max={250}
+              minValue={minPrice}
+              maxValue={maxPrice}
+              onChange={(low, high) => {
+                setMinPrice(low === '0' ? '' : low)
+                setMaxPrice(high === '250' ? '' : high)
+                setPageNumber(1)
+              }}
+            />
           </div>
         </aside>
 

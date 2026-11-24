@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import FilterSelect from '../../components/admin/FilterSelect.jsx'
 import Pill from '../../components/admin/Pill.jsx'
 import {
   deleteExperience,
@@ -17,11 +18,11 @@ import {
 import { notify } from '../../lib/notify.js'
 
 const statusFilters = [
-  { key: '', label: 'Todas' },
-  { key: 'PUBLICADA', label: 'Publicadas' },
-  { key: 'BORRADOR', label: 'Borradores' },
-  { key: 'PAUSADA', label: 'Pausadas' },
-  { key: 'RETIRADA', label: 'Retiradas' },
+  { value: '', label: 'Estado: todas' },
+  { value: 'PUBLICADA', label: 'Publicadas' },
+  { value: 'BORRADOR', label: 'Borradores' },
+  { value: 'PAUSADA', label: 'Pausadas' },
+  { value: 'RETIRADA', label: 'Retiradas' },
 ]
 
 function OperatorExperiences() {
@@ -143,22 +144,13 @@ function OperatorExperiences() {
       </header>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap gap-2">
-          {statusFilters.map((f) => (
-            <button
-              key={f.key || 'all'}
-              type="button"
-              onClick={() => setStatusFilter(f.key)}
-              className={`rounded-full px-4 py-1.5 text-xs font-semibold ${
-                statusFilter === f.key
-                  ? 'bg-brand text-white'
-                  : 'border border-mist bg-surface text-muted hover:text-ink'
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
+        <FilterSelect
+          label="Filtrar por estado"
+          options={statusFilters}
+          value={statusFilter}
+          onChange={(event) => setStatusFilter(event.target.value)}
+          className="min-h-12 md:w-56"
+        />
 
         <input
           type="search"

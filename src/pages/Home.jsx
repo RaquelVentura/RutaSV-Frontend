@@ -84,33 +84,12 @@ function Home() {
   }
 
   return (
-    <div className="space-y-20">
+    <div className="space-y-12">
       {isAuthenticated && user && (
-        <section className="mx-auto max-w-7xl px-6 pt-6">
-          <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-mist bg-info-soft px-6 py-4">
-            <div>
-              <h2 className="text-xl font-bold text-ink">
-                Qué bueno verte, {getDisplayName(user)}
-              </h2>
-              <p className="text-sm text-muted">
-                Explora nuevas experiencias, revisa tus reservas o guarda tus destinos favoritos.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Link
-                to="/turista/mi-actividad/reservas"
-                className="rounded-full bg-brand px-4 py-2 text-xs font-bold text-white hover:bg-brand-dark"
-              >
-                Mis reservas
-              </Link>
-              <Link
-                to="/turista/mi-actividad/favoritos"
-                className="rounded-full border border-mist bg-surface px-4 py-2 text-xs font-semibold text-ink hover:border-brand"
-              >
-                Mis favoritos
-              </Link>
-            </div>
-          </div>
+        <section className="-mb-6 w-full px-6 pt-5">
+          <h2 className="text-xl font-bold text-ink">
+            Qué bueno verte, {getDisplayName(user)}
+          </h2>
         </section>
       )}
       <HeroSection />

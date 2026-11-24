@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import FilterSelect from '../../components/admin/FilterSelect.jsx'
 import Pill from '../../components/admin/Pill.jsx'
 import {
   cancelReservation,
@@ -19,13 +20,13 @@ import {
 } from '../../lib/formatters.js'
 import { notify } from '../../lib/notify.js'
 
-const filterTabs = [
-  { key: '', label: 'Todas' },
-  { key: 'PENDIENTE', label: 'Pendientes' },
-  { key: 'CONFIRMADA', label: 'Confirmadas' },
-  { key: 'PENDIENTE_DECISION', label: 'Acción requerida' },
-  { key: 'COMPLETADA', label: 'Completadas' },
-  { key: 'CANCELADA', label: 'Canceladas' },
+const filterOptions = [
+  { value: '', label: 'Estado: todas' },
+  { value: 'PENDIENTE', label: 'Pendientes' },
+  { value: 'CONFIRMADA', label: 'Confirmadas' },
+  { value: 'PENDIENTE_DECISION', label: 'Acción requerida' },
+  { value: 'COMPLETADA', label: 'Completadas' },
+  { value: 'CANCELADA', label: 'Canceladas' },
 ]
 
 function ActivityReservations() {
@@ -155,7 +156,7 @@ function ActivityReservations() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 px-6 py-8">
+    <div className="w-full space-y-6 px-6 py-8">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-xs font-bold uppercase tracking-wide text-brand">Mi actividad</p>
@@ -164,38 +165,22 @@ function ActivityReservations() {
             Consulta el estado de tus reservas, comprobantes, reembolsos y reagendamientos.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <FilterSelect
+            label="Filtrar reservas por estado"
+            options={filterOptions}
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value)}
+            className="min-h-12 md:w-56"
+          />
           <Link
             to="/turista/mi-actividad/favoritos"
-            className="rounded-full border border-mist bg-surface px-4 py-2 text-sm font-semibold text-ink hover:border-brand"
+            className="rounded-full border border-mist bg-surface px-5 py-3 text-sm font-semibold text-ink transition hover:border-brand hover:text-brand"
           >
-            Ver favoritos
-          </Link>
-          <Link
-            to="/experiencias"
-            className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark"
-          >
-            Explorar experiencias
+            ♡ Favoritos
           </Link>
         </div>
       </header>
-
-      <div className="flex flex-wrap gap-2">
-        {filterTabs.map((tab) => (
-          <button
-            key={tab.key || 'all'}
-            type="button"
-            onClick={() => setStatusFilter(tab.key)}
-            className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
-              statusFilter === tab.key
-                ? 'bg-brand text-white'
-                : 'border border-mist bg-surface text-muted hover:text-ink'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
 
       {errorMessage && (
         <div role="alert" className="rounded-2xl border border-danger/30 bg-danger-soft p-4 text-sm text-danger">

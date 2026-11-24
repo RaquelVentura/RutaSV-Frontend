@@ -5,50 +5,58 @@ import AdminPageHeader from '../../components/admin/AdminPageHeader.jsx'
 import Avatar from '../../components/admin/Avatar.jsx'
 import Pill from '../../components/admin/Pill.jsx'
 import LinkButton from '../../components/LinkButton.jsx'
-import { adminActivity, adminStats } from '../../data/admin.js'
+import { getMyExperiences } from '../../lib/catalogApi.js'
 import {
   getOperatorRequests,
   OperatorRequestStatus,
 } from '../../lib/operatorRequests.js'
 
+const activityTitles = {
+  PENDIENTE: 'Solicitud de operador recibida',
+  APROBADA: 'Solicitud de operador aprobada',
+  RECHAZADA: 'Solicitud de operador rechazada',
+  CANCELADA: 'Solicitud de operador cancelada',
+}
+
+// Todas las cifras salen de la API; mientras llegan (o si fallan) se muestran en cero.
 function AdminDashboard() {
   const [pendingRequests, setPendingRequests] = useState([])
-  const [pendingCount, setPendingCount] = useState(adminStats[0]?.value ?? 0)
+  const [counts, setCounts] = useState({ pending: 0, operators: 0, experiences: 0 })
+  const [activity, setActivity] = useState([])
 
   useEffect(() => {
     let active = true
 
-    async function loadPending() {
-      try {
-        const response = await getOperatorRequests({
-          pageNumber: 1,
-          pageSize: 5,
-          status: OperatorRequestStatus.PENDIENTE,
-        })
-        if (active) {
-          setPendingRequests(response.data)
-          setPendingCount(response.totalRecords)
-        }
-      } catch {
-        if (active) {
-          setPendingRequests([])
-          setPendingCount(0)
-        }
-      }
+    async function load() {
+      const [pending, approved, experiences, recent] = await Promise.allSettled([
+        getOperatorRequests({ pageNumber: 1, pageSize: 5, status: OperatorRequestStatus.PENDIENTE }),
+        getOperatorRequests({ pageNumber: 1, pageSize: 1, status: OperatorRequestStatus.APROBADA }),
+        getMyExperiences({ pageNumber: 1, pageSize: 1 }),
+        getOperatorRequests({ pageNumber: 1, pageSize: 5 }),
+      ])
+      if (!active) return
+      const value = (result) => (result.status === 'fulfilled' ? result.value : null)
+      setPendingRequests(value(pending)?.data ?? [])
+      setCounts({
+        pending: value(pending)?.totalRecords ?? 0,
+        operators: value(approved)?.totalRecords ?? 0,
+        experiences: value(experiences)?.totalRecords ?? 0,
+      })
+      setActivity(value(recent)?.data ?? [])
     }
 
-    loadPending()
+    load()
 
     return () => {
       active = false
     }
   }, [])
 
-  const stats = adminStats.map((stat) =>
-    stat.label === 'Solicitudes pendientes'
-      ? { ...stat, value: pendingCount }
-      : stat,
-  )
+  const stats = [
+    { label: 'Solicitudes pendientes', value: counts.pending, note: 'Requieren tu revisión', tone: 'pending' },
+    { label: 'Empresas activas', value: counts.operators, note: 'Operadores aprobados', tone: 'success' },
+    { label: 'Experiencias en el catálogo', value: counts.experiences, note: 'De todos los operadores', tone: 'info' },
+  ]
 
   return (
     <div className="space-y-6">
@@ -62,7 +70,7 @@ function AdminDashboard() {
         }
       />
 
-      <section aria-label="Resumen" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section aria-label="Resumen" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {stats.map((stat) => (
           <AdminCard key={stat.label}>
             <p className="text-xs text-muted">{stat.label}</p>
@@ -118,14 +126,22 @@ function AdminDashboard() {
         </AdminCard>
 
         <AdminCard title="Actividad reciente">
-          <ul className="divide-y divide-mist">
-            {adminActivity.map((item) => (
-              <li key={item.title} className="py-3">
-                <p className="text-sm font-semibold text-ink">{item.title}</p>
-                <p className="text-xs text-muted">{item.detail}</p>
-              </li>
-            ))}
-          </ul>
+          {activity.length === 0 ? (
+            <p className="py-6 text-sm text-muted">Todavía no hay actividad reciente.</p>
+          ) : (
+            <ul className="divide-y divide-mist">
+              {activity.map((item) => (
+                <li key={item.id} className="py-3">
+                  <p className="text-sm font-semibold text-ink">
+                    {activityTitles[item.status] ?? 'Solicitud de operador'}
+                  </p>
+                  <p className="text-xs text-muted">
+                    {item.name} · {item.sentAt}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
         </AdminCard>
       </div>
     </div>

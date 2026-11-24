@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { AuthProvider } from '../context/AuthContext.jsx'
@@ -229,5 +229,68 @@ describe('MainLayout', () => {
     expect(screen.getByRole('main')).toContainElement(
       screen.getByText('Contenido de la página'),
     )
+  })
+
+  it.each([
+    ['ADMIN', 'Secciones del panel', 'Experiencias'],
+    ['OPERADOR', 'Navegación del operador', 'Mis experiencias'],
+  ])('el %s ve su propio encabezado también en el sitio', (role, navName, link) => {
+    localStorage.setItem(
+      'token',
+      createMockJwt({
+        sub: 'ec25601c-d3fb-41ff-a022-2b143afade36',
+        email: 'rol@rutasv.com',
+        given_name: 'Rol',
+        family_name: 'Prueba',
+        'http://schemas.microsoft.com/ws/2008/06/identity/claims/role': role,
+        email_verified: 'true',
+        exp: 4102444800,
+      }),
+    )
+
+    render(
+      <MemoryRouter>
+        <AuthProvider>
+          <Routes>
+            <Route element={<MainLayout />}>
+              <Route index element={<p>Contenido del sitio</p>} />
+            </Route>
+          </Routes>
+        </AuthProvider>
+      </MemoryRouter>,
+    )
+
+    const nav = screen.getByRole('navigation', { name: navName })
+    expect(within(nav).getByRole('link', { name: link })).toBeInTheDocument()
+    expect(within(nav).getByRole('link', { name: 'Ver sitio' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Favoritos' })).not.toBeInTheDocument()
+  })
+
+  it('el visitante ve Mis reservas pero no Favoritos en el encabezado', () => {
+    localStorage.setItem(
+      'token',
+      createMockJwt({
+        sub: 'ec25601c-d3fb-41ff-a022-2b143afade36',
+        email: 'v@rutasv.com',
+        given_name: 'Vi',
+        family_name: 'Sitante',
+        'http://schemas.microsoft.com/ws/2008/06/identity/claims/role': 'VISITANTE',
+        email_verified: 'true',
+        exp: 4102444800,
+      }),
+    )
+    render(
+      <MemoryRouter>
+        <AuthProvider>
+          <Routes>
+            <Route element={<MainLayout />}>
+              <Route index element={<p>Contenido del sitio</p>} />
+            </Route>
+          </Routes>
+        </AuthProvider>
+      </MemoryRouter>,
+    )
+    expect(screen.getByRole('link', { name: 'Mis reservas' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Favoritos' })).not.toBeInTheDocument()
   })
 })

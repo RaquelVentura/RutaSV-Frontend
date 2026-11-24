@@ -1,85 +1,64 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import AdminPageHeader from '../../components/admin/AdminPageHeader.jsx'
 import Avatar from '../../components/admin/Avatar.jsx'
-import FilterSelect from '../../components/admin/FilterSelect.jsx'
 import Notice from '../../components/admin/Notice.jsx'
 import Pagination from '../../components/admin/Pagination.jsx'
 import Pill from '../../components/admin/Pill.jsx'
 import SearchInput from '../../components/admin/SearchInput.jsx'
-import { operators as initialOperators } from '../../data/operators.js'
+import { extractBackendErrorMessage, getOperatorRequests, OperatorRequestStatus } from '../../lib/operatorRequests.js'
 import useAdminSearch from '../../lib/useAdminSearch.js'
-
-const ALL = 'todos'
-
-const statusOptions = [
-  { value: ALL, label: 'Estado: todos' },
-  { value: 'Activo', label: 'Activo' },
-  { value: 'En revisión', label: 'En revisión' },
-  { value: 'Suspendido', label: 'Suspendido' },
-]
-
-const statusTones = { Activo: 'success', 'En revisión': 'pending', Suspendido: 'danger' }
 
 const actionClass =
   'rounded-lg border px-3 py-1 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40'
 const neutralAction = `${actionClass} border-brand text-brand hover:bg-info-soft`
-const dangerAction = `${actionClass} border-danger text-danger hover:bg-danger-soft`
 
-// Cada acción navega o cambia el estado del operador.
-function getActions(operator) {
-  if (operator.status === 'En revisión') {
-    return [{ label: 'Ver solicitud', to: `/admin/solicitudes?q=${encodeURIComponent(operator.name)}` }]
-  }
-  const last =
-    operator.status === 'Suspendido'
-      ? { label: 'Reactivar', toggleTo: 'Activo' }
-      : { label: 'Suspender', toggleTo: 'Suspendido', danger: true }
-  return [
-    { label: 'Ver perfil', to: `/empresas/${operator.slug}` },
-    { label: 'Ver experiencias', to: `/empresas/${operator.slug}#experiencias` },
-    last,
-  ]
-}
-
+// Los operadores son los negocios con solicitud aprobada.
 function OperatorsList() {
   const location = useLocation()
   const [query, setQuery] = useAdminSearch()
-  const [status, setStatus] = useState(ALL)
-  const [operators, setOperators] = useState(initialOperators)
-  const [notice, setNotice] = useState('')
+  const [operators, setOperators] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [errorMessage, setErrorMessage] = useState('')
 
-  // Sin API todavía: el cambio de estado solo vive en esta pantalla.
-  function changeStatus(operator, nextStatus) {
-    setOperators((current) =>
-      current.map((item) => (item.id === operator.id ? { ...item, status: nextStatus } : item)),
-    )
-    setNotice(
-      nextStatus === 'Suspendido'
-        ? `${operator.name} quedó suspendido.`
-        : `${operator.name} volvió a estar activo.`,
-    )
-  }
+  useEffect(() => {
+    let cancelled = false
+    getOperatorRequests({ pageNumber: 1, pageSize: 100, status: OperatorRequestStatus.APROBADA })
+      .then((response) => {
+        if (!cancelled) setOperators(response.data)
+      })
+      .catch((error) => {
+        if (!cancelled) setErrorMessage(extractBackendErrorMessage(error, 'No se pudo cargar la lista de operadores.'))
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const term = query.trim().toLowerCase()
-  const visible = operators
-    .filter((operator) => status === ALL || operator.status === status)
-    .filter(
-      (operator) =>
-        !term ||
-        operator.name.toLowerCase().includes(term) ||
-        operator.email.toLowerCase().includes(term),
-    )
+  const visible = useMemo(
+    () =>
+      operators.filter(
+        (operator) =>
+          !term ||
+          operator.tradeName.toLowerCase().includes(term) ||
+          operator.contactEmail.toLowerCase().includes(term),
+      ),
+    [operators, term],
+  )
 
   return (
     <div className="space-y-6">
       <AdminPageHeader
         title="Operadores"
-        subtitle="Consulta y administra a los negocios que publican experiencias."
+        subtitle="Consulta a los negocios que publican experiencias."
       />
 
       {location.state?.notice && <Notice tone="success">{location.state.notice}</Notice>}
-      {notice && <Notice tone="success">{notice}</Notice>}
+      {errorMessage && <Notice tone="error">{errorMessage}</Notice>}
 
       <div className="flex flex-wrap items-center gap-3">
         <SearchInput
@@ -89,78 +68,69 @@ function OperatorsList() {
           onChange={(event) => setQuery(event.target.value)}
           className="min-w-64 flex-1"
         />
-        <FilterSelect
-          label="Estado"
-          options={statusOptions}
-          value={status}
-          onChange={(event) => setStatus(event.target.value)}
-        />
-        <FilterSelect label="Registro" options={['Registro: más recientes']} />
       </div>
 
-      {visible.length === 0 ? (
+      {loading ? (
+        <div className="h-40 animate-pulse rounded-2xl bg-surface" />
+      ) : visible.length === 0 ? (
         <div className="rounded-2xl border border-mist bg-surface px-6 py-16 text-center">
-          <h2 className="text-sm font-bold text-ink">Ningún operador coincide con tu búsqueda</h2>
-          <p className="mt-1 text-xs text-muted">Prueba con otros filtros.</p>
+          <h2 className="text-sm font-bold text-ink">
+            {operators.length === 0 ? 'Aún no hay operadores aprobados' : 'Ningún operador coincide con tu búsqueda'}
+          </h2>
+          <p className="mt-1 text-xs text-muted">
+            {operators.length === 0
+              ? 'Cuando apruebes una solicitud de operador, su negocio aparecerá aquí.'
+              : 'Prueba con otros filtros.'}
+          </p>
         </div>
       ) : (
         <>
           <div className="overflow-hidden rounded-2xl border border-mist bg-surface">
-            <div className="hidden grid-cols-[1.6fr_1fr_1fr_1fr_2fr] gap-4 border-b border-mist bg-canvas px-5 py-3 text-xs font-semibold text-muted md:grid">
+            <div className="hidden grid-cols-[2fr_1fr_1fr_2fr] gap-4 border-b border-mist bg-canvas px-5 py-3 text-xs font-semibold text-muted md:grid">
               <span>Operador</span>
               <span>Estado</span>
-              <span>Experiencias</span>
-              <span>Registro</span>
+              <span>Aprobado</span>
               <span>Acciones</span>
             </div>
             <ul className="divide-y divide-mist">
               {visible.map((operator) => (
                 <li
                   key={operator.id}
-                  className="grid items-center gap-3 px-5 py-4 md:grid-cols-[1.6fr_1fr_1fr_1fr_2fr] md:gap-4"
+                  className="grid items-center gap-3 px-5 py-4 md:grid-cols-[2fr_1fr_1fr_2fr] md:gap-4"
                 >
                   <div className="flex items-center gap-3">
-                    <Avatar name={operator.name} />
+                    <Avatar name={operator.tradeName} />
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-ink">{operator.name}</p>
-                      <p className="truncate text-xs text-muted">{operator.email}</p>
+                      <p className="text-sm font-semibold text-ink">{operator.tradeName}</p>
+                      <p className="truncate text-xs text-muted">{operator.contactEmail}</p>
                     </div>
                   </div>
                   <div>
-                    <Pill tone={statusTones[operator.status]}>{operator.status}</Pill>
+                    <Pill tone="success">Activo</Pill>
                   </div>
-                  <p className="text-sm text-ink">
-                    {operator.experiences}{' '}
-                    {operator.experiences === 1 ? 'experiencia' : 'experiencias'}
-                  </p>
-                  <p className="text-sm text-ink">{operator.registeredAt}</p>
+                  <p className="text-sm text-ink">{operator.reviewedAt ? new Date(operator.reviewedAt).toLocaleDateString('es-SV', { day: '2-digit', month: 'short', year: 'numeric' }) : operator.sentShort}</p>
                   <div className="flex flex-wrap gap-2">
-                    {getActions(operator).map((action) => {
-                      const label = `${action.label} de ${operator.name}`
-                      const className = action.danger ? dangerAction : neutralAction
-                      return action.to ? (
-                        <Link key={action.label} to={action.to} aria-label={label} className={className}>
-                          {action.label}
-                        </Link>
-                      ) : (
-                        <button
-                          key={action.label}
-                          type="button"
-                          aria-label={label}
-                          onClick={() => changeStatus(operator, action.toggleTo)}
-                          className={className}
-                        >
-                          {action.label}
-                        </button>
-                      )
-                    })}
+                    <Link
+                      to={`/empresas/${operator.companyId}`}
+                      aria-label={`Ver perfil de ${operator.tradeName}`}
+                      className={neutralAction}
+                    >
+                      Ver perfil
+                    </Link>
+                    <Link
+                      to={`/admin/experiencias?q=${encodeURIComponent(operator.tradeName)}`}
+                      aria-label={`Ver experiencias de ${operator.tradeName}`}
+                      className={neutralAction}
+                    >
+                      Ver experiencias
+                    </Link>
                   </div>
                 </li>
               ))}
             </ul>
           </div>
           <Pagination
-            summary={`Mostrando 1–${visible.length} de ${operators.length} operadores`}
+            summary={`Mostrando ${visible.length} de ${operators.length} operadores`}
             pages={[1]}
           />
         </>

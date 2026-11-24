@@ -39,14 +39,9 @@ function NavBar({ user = null, onLogout, onMenuOpen }) {
             Explorar
           </Link>
           {user && (
-            <>
-              <Link to="/turista/mi-actividad/reservas" className={linkClass}>
-                Mis reservas
-              </Link>
-              <Link to="/turista/mi-actividad/favoritos" className={linkClass}>
-                Favoritos
-              </Link>
-            </>
+            <Link to="/turista/mi-actividad/reservas" className={linkClass}>
+              Mis reservas
+            </Link>
           )}
         </div>
 

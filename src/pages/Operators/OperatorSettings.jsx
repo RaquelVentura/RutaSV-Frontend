@@ -152,7 +152,7 @@ function OperatorSettings() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="w-full space-y-6">
       <header>
         <p className="text-xs font-bold uppercase tracking-wide text-brand">Perfil de empresa</p>
         <h1 className="mt-1 text-3xl font-bold text-ink">Configuración del negocio</h1>

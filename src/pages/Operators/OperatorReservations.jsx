@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import FilterSelect from '../../components/admin/FilterSelect.jsx'
 import Pill from '../../components/admin/Pill.jsx'
 import {
   cancelReservation,
@@ -19,14 +20,14 @@ import {
 } from '../../lib/formatters.js'
 import { notify } from '../../lib/notify.js'
 
-const filterTabs = [
-  { key: '', label: 'Todas' },
-  { key: 'PENDIENTE', label: 'Pendientes' },
-  { key: 'CONFIRMADA', label: 'Confirmadas' },
-  { key: 'PENDIENTE_DECISION', label: 'Pend. decisión' },
-  { key: 'COMPLETADA', label: 'Completadas' },
-  { key: 'CANCELADA', label: 'Canceladas' },
-  { key: 'RECHAZADA', label: 'Rechazadas' },
+const filterOptions = [
+  { value: '', label: 'Estado: todas' },
+  { value: 'PENDIENTE', label: 'Pendientes' },
+  { value: 'CONFIRMADA', label: 'Confirmadas' },
+  { value: 'PENDIENTE_DECISION', label: 'Pendiente de decisión' },
+  { value: 'COMPLETADA', label: 'Completadas' },
+  { value: 'CANCELADA', label: 'Canceladas' },
+  { value: 'RECHAZADA', label: 'Rechazadas' },
 ]
 
 function OperatorReservations() {
@@ -232,22 +233,13 @@ function OperatorReservations() {
       </header>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap gap-2">
-          {filterTabs.map((t) => (
-            <button
-              key={t.key || 'all'}
-              type="button"
-              onClick={() => setStatusFilter(t.key)}
-              className={`rounded-full px-3.5 py-1.5 text-xs font-semibold ${
-                statusFilter === t.key
-                  ? 'bg-brand text-white'
-                  : 'border border-mist bg-surface text-muted hover:text-ink'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+        <FilterSelect
+          label="Filtrar reservas por estado"
+          options={filterOptions}
+          value={statusFilter}
+          onChange={(event) => setStatusFilter(event.target.value)}
+          className="min-h-12 md:w-56"
+        />
 
         <input
           type="search"

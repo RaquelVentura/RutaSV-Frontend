@@ -45,7 +45,7 @@ function ActivityFavorites() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 px-6 py-8">
+    <div className="w-full space-y-6 px-6 py-8">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-xs font-bold uppercase tracking-wide text-brand">Mi actividad</p>
@@ -54,20 +54,12 @@ function ActivityFavorites() {
             Guarda las actividades que quieres reservar más adelante.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Link
-            to="/turista/mi-actividad/reservas"
-            className="rounded-full border border-mist bg-surface px-4 py-2 text-sm font-semibold text-ink hover:border-brand"
-          >
-            Ver mis reservas
-          </Link>
-          <Link
-            to="/experiencias"
-            className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark"
-          >
-            Explorar catálogo
-          </Link>
-        </div>
+        <Link
+          to="/turista/mi-actividad/reservas"
+          className="rounded-full border border-mist bg-surface px-5 py-3 text-sm font-semibold text-ink transition hover:border-brand hover:text-brand"
+        >
+          Mis reservas
+        </Link>
       </header>
 
       {errorMessage && (

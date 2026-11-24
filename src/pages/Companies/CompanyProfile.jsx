@@ -34,7 +34,7 @@ function CompanyProfile() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-6xl space-y-6 px-6 py-10">
+      <div className="w-full space-y-6 px-6 py-10">
         <div className="h-36 animate-pulse rounded-2xl bg-surface" />
         <div className="grid gap-6 md:grid-cols-3">
           {[1, 2, 3].map((n) => (
@@ -61,7 +61,7 @@ function CompanyProfile() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-10 px-6 py-8">
+    <div className="w-full space-y-10 px-6 py-8">
       <section className="rounded-2xl border border-mist bg-surface p-7">
         <div className="flex flex-wrap items-start gap-6">
           {company.logoUrl ? (
