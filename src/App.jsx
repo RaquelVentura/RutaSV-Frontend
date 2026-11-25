@@ -1,4 +1,5 @@
 import { GoogleOAuthProvider } from '@react-oauth/google'
+import { Toaster } from 'sonner'
 import { AuthProvider } from './context/AuthContext.jsx'
 import AppRoutes from './router.jsx'
 
@@ -10,6 +11,7 @@ function App() {
     <GoogleOAuthProvider clientId={googleClientId}>
       <AuthProvider>
         <AppRoutes />
+        <Toaster richColors position="top-right" />
       </AuthProvider>
     </GoogleOAuthProvider>
   )

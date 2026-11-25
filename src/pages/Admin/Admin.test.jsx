@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../../App.jsx'
@@ -113,6 +113,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.useRealTimers()
   cleanup()
   localStorage.clear()
 })
@@ -194,15 +195,13 @@ describe('Vistas de administrador', () => {
     expect(screen.getByRole('button', { name: /AR · Admin RutaSV/ })).toBeInTheDocument()
   })
 
-  it('el buscador del encabezado filtra la lista de usuarios', () => {
+  it('el buscador del encabezado comparte el término con la lista de usuarios', () => {
     renderAt('/admin/usuarios')
 
     fireEvent.change(screen.getByRole('searchbox', { name: '¿Qué vas a gestionar?' }), {
       target: { value: 'marta' },
     })
 
-    expect(screen.getByText('Marta Rivas')).toBeInTheDocument()
-    expect(screen.queryByText('Ana López')).not.toBeInTheDocument()
     expect(screen.getByRole('searchbox', { name: 'Buscar usuarios' })).toHaveValue('marta')
   })
 
@@ -330,6 +329,7 @@ describe('Vistas de administrador', () => {
       },
     })
 
+    vi.useFakeTimers({ shouldAdvanceTime: true })
     renderAt(`/admin/solicitudes/${requestId}`)
 
     await screen.findByRole('heading', { name: /solicitud de josue antonio/i })
@@ -355,9 +355,16 @@ describe('Vistas de administrador', () => {
       )
     })
 
-    expect(
-      await screen.findByText(/solicitud rechazada\. se notificó/i),
-    ).toBeInTheDocument()
+    // El aviso sale en la página y como notificación emergente.
+    expect((await screen.findAllByText(/solicitud rechazada\. se notificó/i)).length).toBeGreaterThan(0)
+
+    // Tras unos segundos vuelve a la lista de solicitudes.
+    expect(screen.getByRole('heading', { name: /solicitud de josue antonio/i })).toBeInTheDocument()
+    await act(async () => {
+      vi.advanceTimersByTime(5000)
+    })
+    expect(await screen.findByRole('heading', { name: /solicitudes de operador/i })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /solicitud de josue antonio/i })).not.toBeInTheDocument()
   })
 
   it('avisa cuando la solicitud no existe', async () => {
@@ -367,14 +374,12 @@ describe('Vistas de administrador', () => {
     ).toBeInTheDocument()
   })
 
-  it('lista usuarios y filtra por rol', () => {
+  it('no muestra usuarios de ejemplo mientras el backend no los exponga', () => {
     renderAt('/admin/usuarios')
 
-    expect(screen.getByText('Ana López')).toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText('Rol'), { target: { value: 'OPERADOR' } })
-
+    expect(screen.getByText('Aún no hay usuarios para mostrar')).toBeInTheDocument()
     expect(screen.queryByText('Ana López')).not.toBeInTheDocument()
-    expect(screen.getByText('Marta Rivas')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /crear usuario/i })).toBeInTheDocument()
   })
 
   it('crea un usuario y vuelve a la lista con aviso', async () => {

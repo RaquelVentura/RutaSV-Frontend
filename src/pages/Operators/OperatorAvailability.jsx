@@ -1,425 +1,474 @@
-//PANEL DE CUPOS DE EXPERIENCIAS
-
-import { useMemo, useState } from 'react'
-import Dialog from '../../components/admin/Dialog.jsx'
-import CuposCalendar from '../../components/operator/CuposCalendar.jsx'
-import { useAuth } from '../../context/AuthContext.jsx'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import Pill from '../../components/admin/Pill.jsx'
 import {
-  readOperatorCollection,
-  saveOperatorCollection,
-} from './operatorRepository.js'
-
-const fieldClass =
-  'min-h-12 w-full rounded-xl border border-black/15 bg-white px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/15'
-
-function AvailabilityForm({ item, experiences, defaultDate = '', onCancel, onSave }) {
-  function handleSubmit(event) {
-    event.preventDefault()
-    const formData = new FormData(event.currentTarget)
-    const values = {
-      date: String(formData.get('date')),
-      time: String(formData.get('time')),
-      experienceId: Number(formData.get('experienceId')),
-      available: Number(formData.get('available')),
-      capacity: Number(formData.get('capacity')),
-    }
-
-    if (values.available > values.capacity) {
-      onSave(null, 'Los cupos disponibles no pueden superar la capacidad total.')
-      return
-    }
-    onSave(values)
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="grid gap-4 rounded-2xl border border-black/10 bg-white p-5 shadow-sm sm:grid-cols-2 lg:grid-cols-5 lg:items-end">
-      <div className="grid gap-2 sm:col-span-2 lg:col-span-2">
-        <label htmlFor="availability-form-experience" className="text-sm font-semibold text-ink">
-          Experiencia
-        </label>
-        <select
-          id="availability-form-experience"
-          name="experienceId"
-          required
-          defaultValue={item?.experienceId ?? experiences[0]?.id ?? ''}
-          className={fieldClass}
-        >
-          {experiences.map((experience) => (
-            <option key={experience.id} value={experience.id}>{experience.title}</option>
-          ))}
-        </select>
-      </div>
-      <div className="grid gap-2">
-        <label htmlFor="availability-form-date" className="text-sm font-semibold text-ink">Día</label>
-        <input id="availability-form-date" name="date" type="date" required defaultValue={item?.date ?? defaultDate} className={fieldClass} />
-      </div>
-      <div className="grid gap-2">
-        <label htmlFor="availability-form-time" className="text-sm font-semibold text-ink">Hora</label>
-        <input id="availability-form-time" name="time" type="time" required defaultValue={item?.time ?? ''} className={fieldClass} />
-      </div>
-      <div className="grid grid-cols-2 gap-3 lg:col-span-2">
-        <label className="grid gap-2 text-sm font-semibold text-ink" htmlFor="availability-form-capacity">
-          Capacidad total
-          <input id="availability-form-capacity" name="capacity" type="number" min="1" required defaultValue={item?.capacity ?? ''} className={fieldClass} />
-        </label>
-        <label className="grid gap-2 text-sm font-semibold text-ink" htmlFor="availability-form-available">
-          Cupos disponibles
-          <input id="availability-form-available" name="available" type="number" min="0" required defaultValue={item?.available ?? ''} className={fieldClass} />
-        </label>
-      </div>
-      <div className="flex flex-wrap justify-end gap-3 border-t border-black/10 pt-4 sm:col-span-2 lg:col-span-5">
-        <button type="button" onClick={onCancel} className="rounded-full border border-black/15 px-5 py-2.5 text-sm font-semibold text-ink hover:bg-canvas">
-          Cancelar
-        </button>
-        <button type="submit" className="rounded-full bg-brand px-5 py-2.5 text-sm font-bold text-white transition hover:bg-brand-dark">
-          Guardar cupos
-        </button>
-      </div>
-    </form>
-  )
-}
-
-const longDateFormatter = new Intl.DateTimeFormat('es-SV', {
-  weekday: 'long',
-  day: 'numeric',
-  month: 'long',
-  year: 'numeric',
-})
-
-// Día que se muestra al abrir: la próxima sesión o, si no hay, la última cargada.
-function pickInitialDate(rows) {
-  if (rows.length === 0) return ''
-  const sorted = [...rows].map((row) => row.date).sort()
-  const today = new Date().toISOString().slice(0, 10)
-  return sorted.find((date) => date >= today) ?? sorted[sorted.length - 1]
-}
-
-function monthOf(isoDate) {
-  const base = isoDate ? new Date(`${isoDate}T00:00:00`) : new Date()
-  return { year: base.getFullYear(), month: base.getMonth() }
-}
+  cancelAvailability,
+  createAvailability,
+  createExperienceSchedule,
+  deleteExperienceSchedule,
+  generateAvailabilities,
+  getExperienceSchedules,
+  getMyAvailabilities,
+  updateAvailability,
+} from '../../lib/bookingApi.js'
+import { extractApiError, getMyExperiences } from '../../lib/catalogApi.js'
+import {
+  availabilityStatusMeta,
+  dayOfWeekLabels,
+  formatCurrency,
+  formatDateReadable,
+} from '../../lib/formatters.js'
+import { notify } from '../../lib/notify.js'
 
 function OperatorAvailability() {
-  const { user } = useAuth()
-  const { experiences, initialRows } = useMemo(
-    () => ({
-      experiences: readOperatorCollection(user, 'experiences'),
-      initialRows: readOperatorCollection(user, 'availability'),
-    }),
-    [user],
-  )
-  const [rows, setRows] = useState(initialRows)
-  const [selectedExperience, setSelectedExperience] = useState('Todas')
-  const [editingId, setEditingId] = useState(null)
-  const [adding, setAdding] = useState(false)
-  const [notice, setNotice] = useState(null)
-  const [cancelling, setCancelling] = useState(null)
-  const [cancelReason, setCancelReason] = useState('')
-  const [cancelError, setCancelError] = useState('')
-  const [selectedDate, setSelectedDate] = useState(() => pickInitialDate(initialRows))
-  const experienceById = new Map(experiences.map((experience) => [String(experience.id), experience]))
-  const filteredRows = rows.filter((item) => {
-    if (selectedExperience === 'Todas') return true
-    return String(item.experienceId) === selectedExperience
-  })
+  const [searchParams] = useSearchParams()
+  const initialExpId = searchParams.get('experiencia') || ''
 
-  const dayRows = filteredRows.filter((item) => item.date === selectedDate)
+  const [experiences, setExperiences] = useState([])
+  const [selectedExpId, setSelectedExpId] = useState(initialExpId)
+  const [availabilities, setAvailabilities] = useState([])
+  const [schedules, setSchedules] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [errorBanner, setErrorBanner] = useState('')
 
-  function persist(updatedRows) {
-    saveOperatorCollection(user, 'availability', updatedRows)
-    setRows(updatedRows)
-    setNotice({
-      type: 'success',
-      text: 'Disponibilidad guardada en este navegador; estos datos quedan listos para conectarse al backend.',
-    })
+  // Formulario nueva sesión
+  const [date, setDate] = useState('')
+  const [startTime, setStartTime] = useState('09:00')
+  const [endTime, setEndTime] = useState('12:00')
+  const [totalCapacity, setTotalCapacity] = useState('10')
+  const [specialPrice, setSpecialPrice] = useState('')
+  const [savingSlot, setSavingSlot] = useState(false)
+
+  // Plantilla semanal y generador
+  const [schedDay, setSchedDay] = useState('6')
+  const [schedStart, setSchedStart] = useState('09:00')
+  const [schedCap, setSchedCap] = useState('10')
+  const [genFrom, setGenFrom] = useState('')
+  const [genTo, setGenTo] = useState('')
+  const [reloadKey, setReloadKey] = useState(0)
+
+  function loadData() {
+    setReloadKey((k) => k + 1)
   }
 
-  // Reservas activas que caen en una sesión (misma experiencia, día y hora).
-  function reservationsOfSession(session) {
-    return readOperatorCollection(user, 'reservations').filter((reservation) => {
-      if (String(reservation.experienceId) !== String(session.experienceId)) return false
-      if (reservation.status !== 'Pendiente' && reservation.status !== 'Confirmada') return false
-      if (!reservation.startsAt) return false
-      const start = new Date(reservation.startsAt)
-      const pad = (value) => String(value).padStart(2, '0')
-      return (
-        `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}` === session.date &&
-        `${pad(start.getHours())}:${pad(start.getMinutes())}` === session.time
-      )
-    })
-  }
+  useEffect(() => {
+    let cancelled = false
+    async function fetchAll() {
+      try {
+        const [expRes, availList] = await Promise.all([
+          getMyExperiences({ pageNumber: 1, pageSize: 100 }),
+          getMyAvailabilities({ experienceId: selectedExpId || undefined }),
+        ])
+        if (cancelled) return
+        const expItems = expRes?.data ?? []
+        setErrorBanner('')
+        setExperiences(expItems)
+        setAvailabilities(availList ?? [])
 
-  function openCancel(session) {
-    setCancelling({ session, affected: reservationsOfSession(session) })
-    setCancelReason('')
-    setCancelError('')
-  }
-
-  function confirmCancelSession(event) {
-    event.preventDefault()
-    const motive = cancelReason.trim()
-    if (!motive) {
-      setCancelError('El motivo es obligatorio.')
-      return
-    }
-    const { session, affected } = cancelling
-    try {
-      const updatedRows = rows.map((item) =>
-        item.id === session.id ? { ...item, available: 0, closed: true, closedReason: motive } : item,
-      )
-      saveOperatorCollection(user, 'availability', updatedRows)
-      if (affected.length > 0) {
-        const ids = new Set(affected.map((reservation) => reservation.id))
-        const updatedReservations = readOperatorCollection(user, 'reservations').map((reservation) =>
-          ids.has(reservation.id)
-            ? { ...reservation, status: 'Pendiente de decisión', cancelReason: motive }
-            : reservation,
-        )
-        saveOperatorCollection(user, 'reservations', updatedReservations)
+        const activeExpId = selectedExpId || expItems[0]?.id || ''
+        if (!selectedExpId && activeExpId) {
+          setSelectedExpId(activeExpId)
+        }
+        if (activeExpId) {
+          const scheds = await getExperienceSchedules(activeExpId)
+          if (!cancelled) setSchedules(scheds)
+        } else {
+          setSchedules([])
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setErrorBanner(extractApiError(error, 'No se pudo cargar la disponibilidad.').message)
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
       }
-      setRows(updatedRows)
-      setNotice({
-        type: 'success',
-        text:
-          affected.length > 0
-            ? `Sesión cancelada. ${affected.length} ${affected.length === 1 ? 'reserva quedó' : 'reservas quedaron'} pendiente de decisión del viajero (reagendar o reembolso).`
-            : 'Sesión cancelada. No tenía reservas.',
-      })
-    } catch (error) {
-      setNotice({ type: 'error', text: `No se pudo cancelar la sesión: ${error.message}` })
     }
-    setCancelling(null)
-  }
+    fetchAll()
+    return () => {
+      cancelled = true
+    }
+  }, [selectedExpId, reloadKey])
 
-  function handleSave(values, validationError) {
-    if (validationError) {
-      setNotice({ type: 'error', text: validationError })
+  async function handleCreateSlot(event) {
+    event.preventDefault()
+    if (!selectedExpId || !date || !startTime) {
+      notify.error('Selecciona experiencia, fecha y hora de inicio.')
       return
     }
-
-    const updatedRows = editingId
-      ? rows.map((item) => item.id === editingId ? { ...item, ...values } : item)
-      : [...rows, { id: `availability-${Date.now()}`, ...values }]
-
+    setSavingSlot(true)
     try {
-      persist(updatedRows)
-      setEditingId(null)
-      setAdding(false)
+      await createAvailability(selectedExpId, {
+        date,
+        startTime,
+        endTime: endTime || null,
+        totalCapacity: Number(totalCapacity || 10),
+        specialPrice: specialPrice !== '' ? Number(specialPrice) : null,
+      })
+      notify.success('Sesión creada correctamente.')
+      setSpecialPrice('')
+      await loadData()
     } catch (error) {
-      setNotice({ type: 'error', text: `No se pudieron guardar los cupos: ${error.message}` })
+      notify.error(extractApiError(error).message)
+    } finally {
+      setSavingSlot(false)
+    }
+  }
+
+  async function handleToggleBlock(slot) {
+    const nextStatus = slot.status === 'BLOQUEADA' ? 'ABIERTA' : 'BLOQUEADA'
+    try {
+      await updateAvailability(slot.id, {
+        date: slot.date,
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        totalCapacity: slot.totalCapacity,
+        specialPrice: slot.specialPrice,
+        status: nextStatus,
+      })
+      notify.success(nextStatus === 'BLOQUEADA' ? 'Sesión bloqueada.' : 'Sesión reabierta.')
+      await loadData()
+    } catch (error) {
+      notify.error(extractApiError(error).message)
+    }
+  }
+
+  async function handleCancelSlot(slot) {
+    const reason = window.prompt(
+      `Motivo para cancelar la sesión del ${slot.date} ${slot.startTime} (si hay reservas activas pasarán a PENDIENTE_DECISION según RN-21):`,
+      'Clima adverso',
+    )
+    if (reason === null) return
+    try {
+      await cancelAvailability(slot.id, reason)
+      notify.success('Sesión cancelada y visitantes afectados notificados.')
+      await loadData()
+    } catch (error) {
+      notify.error(extractApiError(error).message)
+    }
+  }
+
+  async function handleAddSchedule(event) {
+    event.preventDefault()
+    if (!selectedExpId) return
+    try {
+      await createExperienceSchedule(selectedExpId, {
+        dayOfWeek: Number(schedDay),
+        startTime: schedStart,
+        endTime: null,
+        defaultCapacity: Number(schedCap || 10),
+      })
+      notify.success('Horario semanal agregado.')
+      await loadData()
+    } catch (error) {
+      notify.error(extractApiError(error).message)
+    }
+  }
+
+  async function handleDeleteSchedule(scheduleId) {
+    try {
+      await deleteExperienceSchedule(scheduleId)
+      notify.success('Horario eliminado.')
+      await loadData()
+    } catch (error) {
+      notify.error(extractApiError(error).message)
+    }
+  }
+
+  async function handleGenerateSlots(event) {
+    event.preventDefault()
+    if (!selectedExpId || !genFrom || !genTo) {
+      notify.error('Indica fecha inicio y fecha fin para generar sesiones.')
+      return
+    }
+    try {
+      const created = await generateAvailabilities(selectedExpId, {
+        fromDate: genFrom,
+        toDate: genTo,
+      })
+      notify.success(`Se generaron ${created.length} nueva(s) sesión(es).`)
+      await loadData()
+    } catch (error) {
+      notify.error(extractApiError(error).message)
     }
   }
 
   return (
-    <div className="space-y-7 lg:space-y-9">
-      <div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-ink">Cupos</h1>
-        <p className="mt-2 text-sm leading-6 text-muted">
-          Revisa y organiza los espacios disponibles en tus experiencias.
-        </p>
-      </div>
-
-      <section className="grid gap-5 rounded-2xl border border-black/10 bg-white p-5 shadow-sm md:grid-cols-[minmax(240px,0.8fr)_minmax(0,1.2fr)] md:items-end lg:p-7">
-        <div className="grid gap-2">
-          <label htmlFor="availability-experience" className="text-sm font-semibold text-ink">
-            Filtrar experiencia
-          </label>
-          <select
-            id="availability-experience"
-            value={selectedExperience}
-            onChange={(event) => setSelectedExperience(event.target.value)}
-            className={fieldClass}
-          >
-            <option value="Todas">Todas</option>
-            {experiences.map((experience) => (
-              <option key={experience.id} value={String(experience.id)}>{experience.title}</option>
-            ))}
-          </select>
+    <div className="space-y-6">
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-brand">Agenda y cupos</p>
+          <h1 className="mt-1 text-3xl font-bold text-ink">Horarios y disponibilidad</h1>
+          <p className="mt-1 text-sm text-muted">
+            Administra fechas disponibles, cupos máximos, tarifas especiales y plantillas semanales.
+          </p>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-4 border-t border-black/10 pt-5 md:border-l md:border-t-0 md:pl-6 md:pt-0">
-          <div>
-            <p className="text-base font-semibold text-ink">Cupos por fecha</p>
-            <p className="mt-1 text-sm text-muted">Administra disponibilidad y horarios.</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              setAdding((current) => !current)
-              setEditingId(null)
-              setNotice(null)
-            }}
-            className="rounded-full border border-black/10 bg-brand px-5 py-3 text-sm font-bold text-white transition hover:bg-brand-dark"
-          >
-            {adding ? 'Cancelar' : '+ Agregar fecha'}
-          </button>
-        </div>
-      </section>
 
-      {adding && experiences.length > 0 && (
-        <AvailabilityForm
-          experiences={experiences}
-          defaultDate={selectedDate}
-          onCancel={() => setAdding(false)}
-          onSave={handleSave}
-        />
-      )}
-      {!experiences.length && adding && (
-        <p role="alert" className="rounded-xl border border-amber-900/15 bg-amber-50 p-4 text-sm text-amber-900">
-          Primero crea una experiencia para asignarle cupos.
-        </p>
-      )}
-
-      {notice && (
-        <p
-          role={notice.type === 'error' ? 'alert' : 'status'}
-          className={`rounded-xl border p-4 text-sm ${
-            notice.type === 'error'
-              ? 'border-red-900/15 bg-red-50 text-red-900'
-              : 'border-emerald-900/15 bg-emerald-50 text-emerald-900'
-          }`}
+        <select
+          aria-label="Filtrar por experiencia"
+          value={selectedExpId}
+          onChange={(e) => setSelectedExpId(e.target.value)}
+          className="rounded-xl border border-mist bg-surface px-4 py-2.5 text-sm font-semibold text-ink"
         >
-          {notice.text}
-        </p>
+          <option value="">Todas mis experiencias</option>
+          {experiences.map((exp) => (
+            <option key={exp.id} value={exp.id}>
+              {exp.title}
+            </option>
+          ))}
+        </select>
+      </header>
+
+      {errorBanner && (
+        <div role="alert" className="rounded-2xl border border-danger/30 bg-danger-soft p-4 text-sm text-danger">
+          {errorBanner}
+        </div>
       )}
 
-      <CuposCalendar
-        rows={filteredRows}
-        selectedDate={selectedDate}
-        onSelect={(date) => {
-          setSelectedDate(date)
-          setEditingId(null)
-        }}
-        initialMonth={monthOf(selectedDate)}
-      />
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Crear sesión puntual */}
+        <form
+          onSubmit={handleCreateSlot}
+          className="space-y-4 rounded-2xl border border-mist bg-surface p-6"
+        >
+          <h2 className="text-lg font-bold text-ink">Agregar fecha / sesión individual</h2>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div>
+              <label htmlFor="slot-date" className="mb-1 block text-xs font-semibold text-muted">
+                Fecha *
+              </label>
+              <input
+                id="slot-date"
+                type="date"
+                required
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="w-full rounded-xl border border-mist bg-canvas px-3 py-2 text-sm text-ink"
+              />
+            </div>
+            <div>
+              <label htmlFor="slot-start" className="mb-1 block text-xs font-semibold text-muted">
+                Inicio *
+              </label>
+              <input
+                id="slot-start"
+                type="time"
+                required
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                className="w-full rounded-xl border border-mist bg-canvas px-3 py-2 text-sm text-ink"
+              />
+            </div>
+            <div>
+              <label htmlFor="slot-end" className="mb-1 block text-xs font-semibold text-muted">
+                Fin
+              </label>
+              <input
+                id="slot-end"
+                type="time"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+                className="w-full rounded-xl border border-mist bg-canvas px-3 py-2 text-sm text-ink"
+              />
+            </div>
+          </div>
 
-      <section aria-label="Fecha seleccionada" className="rounded-2xl bg-info-soft p-5 lg:p-7">
-        {selectedDate ? (
-          <>
-            <h2 className="text-lg font-bold capitalize text-ink">
-              {longDateFormatter.format(new Date(`${selectedDate}T00:00:00`))}
-            </h2>
-            <p className="mt-1 text-sm text-muted">
-              {dayRows.length === 0
-                ? 'No hay sesiones este día.'
-                : `${dayRows.length} ${dayRows.length === 1 ? 'sesión' : 'sesiones'} con cupos cargados.`}
-            </p>
-          </>
-        ) : (
-          <p className="text-sm text-muted">Selecciona un día del calendario para ver sus sesiones.</p>
-        )}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label htmlFor="slot-cap" className="mb-1 block text-xs font-semibold text-muted">
+                Cupo total *
+              </label>
+              <input
+                id="slot-cap"
+                type="number"
+                min="1"
+                required
+                value={totalCapacity}
+                onChange={(e) => setTotalCapacity(e.target.value)}
+                className="w-full rounded-xl border border-mist bg-canvas px-3 py-2 text-sm text-ink"
+              />
+            </div>
+            <div>
+              <label htmlFor="slot-price" className="mb-1 block text-xs font-semibold text-muted">
+                Precio especial USD (opcional)
+              </label>
+              <input
+                id="slot-price"
+                type="number"
+                min="0"
+                step="0.01"
+                value={specialPrice}
+                onChange={(e) => setSpecialPrice(e.target.value)}
+                placeholder="Usa precio base si vacío"
+                className="w-full rounded-xl border border-mist bg-canvas px-3 py-2 text-sm text-ink"
+              />
+            </div>
+          </div>
 
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
-          {dayRows.map((item) => {
-            const experience = experienceById.get(String(item.experienceId))
-            return (
-              <article key={item.id} className="flex flex-col justify-between rounded-2xl border border-black/10 bg-white p-5 shadow-sm">
-                <div>
-                  <p className="text-base font-bold text-ink">{item.time} · {experience?.title ?? 'Experiencia no disponible'}</p>
-                </div>
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-black/10 pt-4">
-                  {item.closed ? (
-                    <span className="text-sm font-semibold text-danger">Sesión cancelada</span>
-                  ) : (
-                    <span className="text-sm font-semibold text-brand">
-                      {item.available} de {item.capacity} espacios disponibles
-                    </span>
-                  )}
-                  {!item.closed && (
-                    <button
-                      type="button"
-                      onClick={() => openCancel(item)}
-                      aria-label={`Cancelar sesión de las ${item.time}`}
-                      className="rounded-full border border-black/15 px-4 py-2 text-sm font-semibold text-danger transition hover:bg-danger-soft"
-                    >
-                      Cancelar sesión
-                    </button>
-                  )}
-                  {!item.closed && (
+          <button
+            type="submit"
+            disabled={savingSlot || !selectedExpId}
+            className="rounded-full bg-brand px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-dark disabled:opacity-50"
+          >
+            {savingSlot ? 'Guardando...' : '+ Crear sesión'}
+          </button>
+        </form>
+
+        {/* Plantillas semanales y generador */}
+        <div className="space-y-4 rounded-2xl border border-mist bg-surface p-6">
+          <h2 className="text-lg font-bold text-ink">Plantillas semanales y generación masiva</h2>
+
+          <form onSubmit={handleAddSchedule} className="grid gap-2 sm:grid-cols-4">
+            <select
+              value={schedDay}
+              onChange={(e) => setSchedDay(e.target.value)}
+              className="rounded-xl border border-mist bg-canvas px-2.5 py-2 text-xs text-ink"
+            >
+              {dayOfWeekLabels.map((label, idx) => (
+                <option key={label} value={idx}>
+                  {label}
+                </option>
+              ))}
+            </select>
+            <input
+              type="time"
+              value={schedStart}
+              onChange={(e) => setSchedStart(e.target.value)}
+              className="rounded-xl border border-mist bg-canvas px-2.5 py-2 text-xs text-ink"
+            />
+            <input
+              type="number"
+              min="1"
+              value={schedCap}
+              onChange={(e) => setSchedCap(e.target.value)}
+              placeholder="Cupos"
+              className="rounded-xl border border-mist bg-canvas px-2.5 py-2 text-xs text-ink"
+            />
+            <button
+              type="submit"
+              disabled={!selectedExpId}
+              className="rounded-xl bg-ink px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
+            >
+              + Plantilla
+            </button>
+          </form>
+
+          {schedules.length > 0 && (
+            <ul className="space-y-1.5 text-xs">
+              {schedules.map((s) => (
+                <li key={s.id} className="flex items-center justify-between rounded-lg bg-canvas px-3 py-2">
+                  <span>
+                    <strong>{dayOfWeekLabels[s.dayOfWeek]}</strong> · {s.startTime} ({s.defaultCapacity} cupos)
+                  </span>
                   <button
                     type="button"
-                    aria-expanded={editingId === item.id}
-                    onClick={() => {
-                      setEditingId((current) => current === item.id ? null : item.id)
-                      setAdding(false)
-                      setNotice(null)
-                    }}
-                    className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark"
+                    onClick={() => handleDeleteSchedule(s.id)}
+                    className="font-semibold text-danger hover:underline"
                   >
-                    {editingId === item.id ? 'Cerrar edición' : 'Editar cupos'}
+                    Eliminar
                   </button>
-                  )}
-                </div>
-                {editingId === item.id && (
-                  <div className="mt-5 border-t border-black/10 pt-5">
-                    <AvailabilityForm
-                      item={item}
-                      experiences={experiences}
-                      onCancel={() => setEditingId(null)}
-                      onSave={handleSave}
-                    />
-                  </div>
-                )}
-              </article>
-            )
-          })}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <form onSubmit={handleGenerateSlots} className="grid gap-2 border-t border-mist pt-3 sm:grid-cols-3">
+            <input
+              type="date"
+              value={genFrom}
+              onChange={(e) => setGenFrom(e.target.value)}
+              aria-label="Generar desde"
+              className="rounded-xl border border-mist bg-canvas px-2.5 py-2 text-xs text-ink"
+            />
+            <input
+              type="date"
+              value={genTo}
+              onChange={(e) => setGenTo(e.target.value)}
+              aria-label="Generar hasta"
+              className="rounded-xl border border-mist bg-canvas px-2.5 py-2 text-xs text-ink"
+            />
+            <button
+              type="submit"
+              disabled={!selectedExpId || schedules.length === 0}
+              className="rounded-xl border border-brand px-3 py-2 text-xs font-bold text-brand hover:bg-brand hover:text-white disabled:opacity-40"
+            >
+              Generar fechas
+            </button>
+          </form>
         </div>
-        {!filteredRows.length && (
-          <p className="mt-4 rounded-2xl border border-dashed border-black/20 bg-white px-4 py-8 text-center text-sm text-muted">
-            No hay fechas disponibles para esta experiencia.
+      </div>
+
+      {/* Listado de sesiones */}
+      <section className="rounded-2xl border border-mist bg-surface p-6">
+        <h2 className="text-lg font-bold text-ink">
+          Sesiones programadas ({availabilities.length})
+        </h2>
+
+        {loading ? (
+          <p className="mt-4 text-sm text-muted">Cargando sesiones...</p>
+        ) : availabilities.length === 0 ? (
+          <p className="mt-4 text-sm text-muted">
+            No hay sesiones creadas todavía. Agrega una fecha arriba para recibir reservas.
           </p>
+        ) : (
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="border-b border-mist text-xs uppercase text-muted">
+                <tr>
+                  <th className="py-2 pr-4">Experiencia</th>
+                  <th className="py-2 pr-4">Fecha y hora</th>
+                  <th className="py-2 pr-4">Ocupación</th>
+                  <th className="py-2 pr-4">Tarifa</th>
+                  <th className="py-2 pr-4">Estado</th>
+                  <th className="py-2">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-mist">
+                {availabilities.map((slot) => {
+                  const st = availabilityStatusMeta[slot.status] ?? { label: slot.status, tone: 'neutral' }
+                  return (
+                    <tr key={slot.id}>
+                      <td className="py-3 pr-4 font-semibold text-ink">{slot.experienceTitle}</td>
+                      <td className="py-3 pr-4 text-muted">
+                        {formatDateReadable(slot.date)} · {slot.startTime}
+                        {slot.endTime ? ` – ${slot.endTime}` : ''}
+                      </td>
+                      <td className="py-3 pr-4 text-ink">
+                        {slot.reservedCapacity} / {slot.totalCapacity} ({slot.availableSpots} libres)
+                      </td>
+                      <td className="py-3 pr-4 font-semibold text-brand">
+                        {formatCurrency(slot.effectivePrice, slot.currency)}
+                      </td>
+                      <td className="py-3 pr-4">
+                        <Pill tone={st.tone}>{st.label}</Pill>
+                      </td>
+                      <td className="py-3">
+                        {slot.status !== 'CANCELADA' && (
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleBlock(slot)}
+                              className="rounded-full border border-mist px-3 py-1 text-xs font-semibold text-ink hover:border-brand"
+                            >
+                              {slot.status === 'BLOQUEADA' ? 'Reabrir' : 'Bloquear'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleCancelSlot(slot)}
+                              className="rounded-full border border-danger/40 px-3 py-1 text-xs font-semibold text-danger hover:bg-danger-soft"
+                            >
+                              Cancelar sesión
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
-      <p className="text-xs leading-5 text-muted">
-        Disponibilidad de ejemplo guardada en este navegador y aislada por perfil.
-      </p>
-
-      {cancelling && (
-        <Dialog title="Cancelar sesión" onClose={() => setCancelling(null)}>
-          <form onSubmit={confirmCancelSession} noValidate className="mt-4 grid gap-4">
-            <p className="text-sm text-muted">
-              {cancelling.session.date} · {cancelling.session.time}. Se cierra la disponibilidad y se avisa a los viajeros afectados.
-            </p>
-            <div>
-              <p className="text-sm font-semibold text-ink">Reservas afectadas ({cancelling.affected.length})</p>
-              {cancelling.affected.length === 0 ? (
-                <p className="mt-1 text-sm text-muted">Ninguna reserva activa en esta sesión.</p>
-              ) : (
-                <ul className="mt-2 grid gap-1.5 text-sm text-ink">
-                  {cancelling.affected.map((reservation) => (
-                    <li key={reservation.id} className="rounded-lg bg-canvas px-3 py-2">
-                      {reservation.guest} · {reservation.guests} {reservation.guests === 1 ? 'viajero' : 'viajeros'} · {reservation.id}
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {cancelling.affected.length > 0 && (
-                <p className="mt-2 text-xs text-muted">
-                  Cada viajero tendrá 1 mes para reagendar (mismo precio) o pedir el reembolso completo.
-                </p>
-              )}
-            </div>
-            <label className="grid gap-1.5 text-sm font-semibold text-ink" htmlFor="cancel-session-reason">
-              Motivo
-              <textarea
-                id="cancel-session-reason"
-                rows="3"
-                value={cancelReason}
-                onChange={(event) => { setCancelReason(event.target.value); setCancelError('') }}
-                className="w-full rounded-xl border border-black/15 bg-white px-3 py-3 text-sm font-normal text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/15"
-              />
-            </label>
-            {cancelError && <p role="alert" className="text-sm font-semibold text-danger">{cancelError}</p>}
-            <div className="flex justify-end gap-3">
-              <button type="button" onClick={() => setCancelling(null)} className="rounded-xl border border-black/15 px-5 py-2.5 text-sm font-semibold text-ink hover:bg-canvas">
-                Volver
-              </button>
-              <button type="submit" className="rounded-xl bg-danger px-5 py-2.5 text-sm font-bold text-white hover:opacity-90">
-                Cancelar sesión
-              </button>
-            </div>
-          </form>
-        </Dialog>
-      )}
     </div>
   )
 }

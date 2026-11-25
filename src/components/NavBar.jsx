@@ -38,6 +38,11 @@ function NavBar({ user = null, onLogout, onMenuOpen }) {
           <Link to="/experiencias" className={linkClass}>
             Explorar
           </Link>
+          {user && (
+            <Link to="/turista/mi-actividad/reservas" className={linkClass}>
+              Mis reservas
+            </Link>
+          )}
         </div>
 
         <div className="flex items-center gap-3">

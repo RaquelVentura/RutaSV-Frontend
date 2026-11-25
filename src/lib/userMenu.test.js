@@ -9,7 +9,9 @@ describe('menú de usuario', () => {
   })
 
   it('ofrece las mismas opciones para el visitante', () => {
-    expect(labels({ role: 'VISITANTE', emailVerified: true })).toEqual(['Mi perfil'])
+    expect(labels({ role: 'VISITANTE', emailVerified: true })).toEqual([
+      'Mi perfil',
+    ])
   })
 
   it('agrega el panel y Ver sitio para el operador', () => {

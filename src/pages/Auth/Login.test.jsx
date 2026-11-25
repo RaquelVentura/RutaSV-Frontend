@@ -65,6 +65,8 @@ function renderLogin() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/admin" element={<p>Panel de administración</p>} />
+          <Route path="/operador" element={<p>Panel del operador</p>} />
         </Routes>
       </AuthProvider>
     </MemoryRouter>,
@@ -136,5 +138,25 @@ describe('Login', () => {
     expect(screen.getByRole('status')).toHaveTextContent(
       'No se pudo iniciar sesión con Google. Inténtalo de nuevo.',
     )
+  })
+
+  it.each([
+    ['ADMIN', 'Panel de administración'],
+    ['OPERADOR', 'Panel del operador'],
+  ])('lleva al %s primero a su panel', async (role, panel) => {
+    const token = createMockJwt({
+      sub: 'ec25601c-d3fb-41ff-a022-2b143afade36',
+      email: 'rol@rutasv.com',
+      given_name: 'Rol',
+      family_name: 'Prueba',
+      'http://schemas.microsoft.com/ws/2008/06/identity/claims/role': role,
+      exp: 4102444800,
+    })
+    api.post.mockResolvedValueOnce({ data: { token } })
+
+    renderLogin()
+    fireEvent.click(screen.getByRole('button', { name: 'Simular Google Success' }))
+
+    await waitFor(() => expect(screen.getByText(panel)).toBeInTheDocument())
   })
 })

@@ -1,14 +1,27 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
 import api from '../../config/axios';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { Roles } from '../../lib/roles.js';
 
 export default function Login() {
   const [errors, setErrors] = useState({});
   const [notice, setNotice] = useState('');
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const requestedTarget = location.state?.from?.pathname
+    ? `${location.state.from.pathname}${location.state.from.search || ''}`
+    : null;
+
+  // Sin una ruta pedida, cada rol entra primero a su panel.
+  function getRedirectTarget(loggedUser) {
+    if (requestedTarget) return requestedTarget;
+    if (loggedUser?.role === Roles.ADMIN) return '/admin';
+    if (loggedUser?.role === Roles.OPERADOR) return '/operador';
+    return '/';
+  }
 
   function getFieldError(input) {
     if (input.validity.valueMissing) {
@@ -48,10 +61,9 @@ export default function Login() {
 
       const loginData = response.data;
 
-      login(loginData.token);
+      const loggedUser = login(loginData.token);
 
-      // Retorna al inicio "/" de la app
-      navigate('/');
+      navigate(getRedirectTarget(loggedUser), { replace: true });
     } catch (error) {
       console.error('Login failed:', error);
       setNotice('Error al iniciar sesión. Por favor, verifica tus credenciales.');
@@ -77,8 +89,8 @@ export default function Login() {
           ? response.data
           : response.data?.token;
 
-      login(token);
-      navigate('/');
+      const loggedUser = login(token);
+      navigate(getRedirectTarget(loggedUser), { replace: true });
     } catch (error) {
       console.error('Google login failed:', error);
       const backendMessage =

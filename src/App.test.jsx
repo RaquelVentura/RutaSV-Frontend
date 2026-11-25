@@ -1,43 +1,52 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App.jsx'
+import api from './config/axios.js'
+
+vi.mock('./config/axios.js', () => ({
+  default: {
+    get: vi.fn(),
+    post: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn(),
+  },
+}))
+
+vi.mock('@react-oauth/google', () => {
+  function GoogleOAuthProvider({ children }) {
+    return children
+  }
+  function GoogleLogin() {
+    return <button type="button">Google Login</button>
+  }
+  return { GoogleOAuthProvider, GoogleLogin }
+})
 
 function createMockJwt(payload) {
   const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
-  const jsonPayload = JSON.stringify(payload)
-  const utf8Bytes = new TextEncoder().encode(jsonPayload)
-  const binary = Array.from(utf8Bytes, (byte) => String.fromCharCode(byte)).join('')
-  const base64Payload = btoa(binary)
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '')
-  return `${header}.${base64Payload}.signature`
+  const bytes = new TextEncoder().encode(JSON.stringify(payload))
+  const binary = Array.from(bytes, (b) => String.fromCharCode(b)).join('')
+  const body = btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+  return `${header}.${body}.sig`
 }
 
-function setRoleSession(role) {
-  const token = createMockJwt({
-    sub: '3f2504e0-4f89-11d3-9a0c-0305e82c3301',
-    email: `${role.toLowerCase()}@rutasv.com`,
-    given_name: 'Usuario',
-    family_name: role,
-    'http://schemas.microsoft.com/ws/2008/06/identity/claims/role': role,
-    email_verified: 'true',
-    exp: 4102444800,
-  })
-  localStorage.setItem('token', token)
+function setSession(role = 'VISITANTE', emailVerified = 'true') {
+  localStorage.setItem(
+    'token',
+    createMockJwt({
+      sub: '11111111-1111-1111-1111-111111111111',
+      email: `${role.toLowerCase()}@rutasv.com`,
+      given_name: 'Ana',
+      family_name: 'Rivera',
+      'http://schemas.microsoft.com/ws/2008/06/identity/claims/role': role,
+      email_verified: emailVerified,
+      exp: 4102444800,
+    }),
+  )
 }
 
-beforeEach(() => {
-  localStorage.clear()
-})
-
-afterEach(() => {
-  cleanup()
-  localStorage.clear()
-})
-
-function renderAt(path) {
+function renderApp(path) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <App />
@@ -45,614 +54,167 @@ function renderAt(path) {
   )
 }
 
-// Las vistas del operador guardan sus datos localmente (operatorRepository.js)
-// con una clave que depende del perfil activo; la buscamos por colección.
-function readSaved(collection) {
-  const keys = Array.from({ length: localStorage.length }, (_, index) =>
-    localStorage.key(index),
-  )
-  const key = keys.find(
-    (item) => item.startsWith('rutasv:operator:') && item.endsWith(`:${collection}`),
-  )
-  return key ? JSON.parse(localStorage.getItem(key)) : null
-}
+beforeEach(() => {
+  localStorage.clear()
+  vi.clearAllMocks()
+  api.get.mockImplementation((url) => {
+    if (url === '/categories') return Promise.resolve({ data: [{ id: 1, name: 'Playa' }] })
+    if (url === '/departments') return Promise.resolve({ data: [{ id: 5, name: 'La Libertad' }] })
+    if (url.includes('/municipalities')) return Promise.resolve({ data: [{ id: 16, departmentId: 5, name: 'Tamanique' }] })
+    if (url === '/experiences' || url === '/experiences/my') {
+      return Promise.resolve({
+        data: {
+          data: [
+            {
+              id: 'exp-1',
+              slug: 'surf-el-tunco',
+              title: 'Surf al atardecer en El Tunco',
+              shortDescription: 'Clase de surf guiada',
+              description: 'Disfruta una clase de surf en Playa El Tunco.',
+              municipalityName: 'Tamanique',
+              departmentName: 'La Libertad',
+              latitude: 13.4926,
+              longitude: -89.3831,
+              price: 45,
+              currency: 'USD',
+              hasLimitedCapacity: true,
+              minPeople: 1,
+              maxPeople: 6,
+              status: 'PUBLICADA',
+              company: { id: 'c1', tradeName: 'Olas de El Tunco' },
+              images: [{ id: 'img-1', url: 'https://example.com/1.jpg', isCover: true }],
+            },
+          ],
+          totalRecords: 1,
+          totalPages: 1,
+          currentPage: 1,
+          pageSize: 10,
+        },
+      })
+    }
+    if (url === '/availabilities/my') return Promise.resolve({ data: [] })
+    if (url === '/refunds') return Promise.resolve({ data: [] })
+    if (url === '/favorites' || url === '/favorites/ids') return Promise.resolve({ data: [] })
+    if (url === '/reservations/my' || url === '/reservations/operator') {
+      return Promise.resolve({
+        data: {
+          data: [
+            {
+              id: 'res-1',
+              reservationCode: 'RSV-2026-ABC123',
+              experienceId: 'exp-1',
+              experienceTitle: 'Surf al atardecer en El Tunco',
+              experienceSlug: 'surf-el-tunco',
+              activityDate: '2026-12-20',
+              startTime: '09:00',
+              peopleCount: 2,
+              unitPrice: 45,
+              total: 90,
+              currency: 'USD',
+              source: 'WEB',
+              status: 'CONFIRMADA',
+              paymentStatus: 'PAGADO_DEMO',
+              contactName: 'Ana Rivera',
+              contactEmail: 'visitante@rutasv.com',
+              history: [{ id: 'h1', newStatus: 'CONFIRMADA', notes: 'Pago demo', createdAt: '2026-11-23T10:00:00Z' }],
+            },
+          ],
+          totalRecords: 1,
+          totalPages: 1,
+          currentPage: 1,
+          pageSize: 20,
+        },
+      })
+    }
+    if (url === '/reservations/res-1/cancel-preview') {
+      return Promise.resolve({
+        data: {
+          reservationId: 'res-1',
+          canCancel: true,
+          hoursUntilStart: 72,
+          refundPercentage: 100,
+          refundAmount: 90,
+          currency: 'USD',
+          policyDescription: 'Cancelación con 48 horas o más: corresponde reembolso del 100 %.',
+        },
+      })
+    }
+    if (url === '/companies/my') {
+      return Promise.resolve({
+        data: [{ id: 'c1', tradeName: 'Olas de El Tunco', contactEmail: 'hola@olas.sv', municipalityId: 16 }],
+      })
+    }
+    return Promise.resolve({ data: [] })
+  })
+})
 
-describe('App', () => {
-  it('muestra la portada en /', () => {
-    renderAt('/')
-    expect(
-      screen.getByRole('heading', { name: /el salvador se vive/i }),
-    ).toBeInTheDocument()
+afterEach(() => {
+  cleanup()
+  localStorage.clear()
+})
+
+describe('App — Integración end-to-end (rutas, turista, operador y admin)', () => {
+  it('protege /operador para VISITANTE y permite acceso a OPERADOR mostrando métricas reales', async () => {
+    setSession('VISITANTE')
+    renderApp('/operador')
+    expect(screen.getByRole('heading', { name: /sin permiso/i })).toBeInTheDocument()
+
+    cleanup()
+    setSession('OPERADOR')
+    renderApp('/operador')
+    expect(await screen.findByRole('heading', { name: /resumen operativo/i })).toBeInTheDocument()
+    expect(await screen.findByText('RSV-2026-ABC123')).toBeInTheDocument()
   })
 
-  it('redirige a /login si un visitante no autenticado intenta abrir /operador/solicitud', () => {
-    renderAt('/operador/solicitud')
-    expect(
-      screen.getByRole('heading', { name: /qué bueno verte de nuevo/i }),
-    ).toBeInTheDocument()
+  it('redirige /turista/explorar al explorador unificado bajo MainLayout', async () => {
+    renderApp('/turista/explorar')
+    expect(await screen.findByRole('heading', { name: /experiencias turísticas/i })).toBeInTheDocument()
+    expect(await screen.findByText('Surf al atardecer en El Tunco')).toBeInTheDocument()
   })
 
-  it('muestra el formulario de solicitud de operador en su ruta para VISITANTE autenticado', () => {
-    setRoleSession('VISITANTE')
-    renderAt('/operador/solicitud/formulario')
-    expect(
-      screen.getByRole('heading', { name: /solicita ser operador/i }),
-    ).toBeInTheDocument()
-    expect(screen.getByLabelText(/nombre del negocio/i)).toBeInTheDocument()
-  })
-
-  it('muestra Sin permiso cuando un VISITANTE intenta acceder a /admin', () => {
-    setRoleSession('VISITANTE')
-    renderAt('/admin')
-    expect(
-      screen.getByRole('heading', { name: /sin permiso/i }),
-    ).toBeInTheDocument()
-  })
-
-  it('muestra el panel del operador y permite abrir sus vistas', () => {
-    setRoleSession('OPERADOR')
-    renderAt('/operador')
-
-    expect(screen.getByRole('heading', { name: 'Resumen' })).toBeInTheDocument()
-    expect(screen.getByRole('navigation', { name: 'Navegación del operador' })).toBeInTheDocument()
-    expect(
-      screen.getAllByRole('link', { name: /agregar experiencia/i }).some(
-        (link) => link.getAttribute('href') === '/operador/experiencias/nueva',
-      ),
-    ).toBe(true)
-  })
-
-  it('personaliza el resumen con el perfil activo', () => {
-    localStorage.setItem(
-      'token',
-      createMockJwt({
-        sub: 'operator-a',
-        email: 'operator-a@rutasv.com',
-        business_name: 'Volcan Tours',
-        'http://schemas.microsoft.com/ws/2008/06/identity/claims/role': 'OPERADOR',
-        email_verified: 'true',
-        exp: 4102444800,
-      }),
-    )
-
-    renderAt('/operador')
-
-    expect(
-      screen.getByText('Hola, Volcan Tours. Aquí tienes la actividad de tu negocio.'),
-    ).toBeInTheDocument()
-    expect(readSaved('experiences')).toBeNull()
-  })
-
-  it('permite buscar y filtrar las experiencias de muestra', () => {
-    setRoleSession('OPERADOR')
-    renderAt('/operador/experiencias')
-
-    const search = screen.getByRole('searchbox', { name: 'Buscar experiencias' })
-    fireEvent.change(search, { target: { value: 'Apaneca' } })
-    expect(screen.getByText('Ruta de café en Apaneca')).toBeInTheDocument()
-    expect(screen.queryByText('Atardecer y surf en El Tunco')).not.toBeInTheDocument()
-
-    fireEvent.change(search, { target: { value: '' } })
-    fireEvent.change(screen.getByLabelText('Filtrar por estado'), { target: { value: 'Borrador' } })
-    expect(screen.getByText('Caminata al volcán de Santa Ana')).toBeInTheDocument()
-    expect(screen.queryByText('Ruta de café en Apaneca')).not.toBeInTheDocument()
-  })
-
-  it('guarda una experiencia localmente como preparación para el backend', () => {
-    setRoleSession('OPERADOR')
-    renderAt('/operador/experiencias/nueva')
-
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar borrador' }))
-    expect(screen.getByRole('alert')).toHaveTextContent('Escribe el nombre de la experiencia')
-
-    fireEvent.change(screen.getByLabelText('Nombre de la experiencia'), {
-      target: { value: 'Amanecer en el volcán' },
-    })
-    fireEvent.change(screen.getByLabelText('Categoría'), {
-      target: { value: 'Naturaleza' },
-    })
-    fireEvent.change(screen.getByLabelText('Departamento'), {
-      target: { value: 'Santa Ana' },
-    })
-    fireEvent.change(screen.getByLabelText('Municipio'), {
-      target: { value: 'Coatepeque' },
-    })
-    fireEvent.change(screen.getByLabelText('Precio por persona (USD)'), {
-      target: { value: '35' },
-    })
-    fireEvent.change(screen.getByLabelText('Capacidad máxima'), {
-      target: { value: '8' },
-    })
-    fireEvent.change(screen.getByLabelText('Descripción'), {
-      target: { value: 'Una caminata guiada al amanecer.' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar borrador' }))
-
-    expect(screen.getByRole('heading', { name: 'Mis experiencias' })).toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent('Borrador «Amanecer en el volcán» guardado.')
-    expect(readSaved('experiences')).toContainEqual(
-      expect.objectContaining({
-        title: 'Amanecer en el volcán',
-        category: 'Naturaleza',
-        department: 'Santa Ana',
-        municipality: 'Coatepeque',
-        location: 'Coatepeque, Santa Ana',
-        price: 35,
-        capacity: 8,
-        status: 'Borrador',
-      }),
-    )
-  })
-
-  it('el municipio depende del departamento', () => {
-    setRoleSession('OPERADOR')
-    renderAt('/operador/experiencias/nueva')
-
-    const municipality = screen.getByLabelText('Municipio')
-    expect(municipality).toBeDisabled()
-
-    fireEvent.change(screen.getByLabelText('Departamento'), { target: { value: 'La Libertad' } })
-    expect(screen.getByLabelText('Municipio')).toBeEnabled()
-    expect(within(screen.getByLabelText('Municipio')).getByRole('option', { name: 'Tamanique' })).toBeInTheDocument()
-    expect(within(screen.getByLabelText('Municipio')).queryByRole('option', { name: 'Coatepeque' })).not.toBeInTheDocument()
-  })
-
-  it('deshabilita Publicar hasta completar el checklist y publica con ubicación y 3 fotos', () => {
-    setRoleSession('OPERADOR')
-    renderAt('/operador/experiencias/nueva')
-
-    const publish = screen.getByRole('button', { name: 'Publicar experiencia' })
-    expect(publish).toBeDisabled()
-    expect(screen.getByRole('heading', { name: 'Completa para publicar' })).toBeInTheDocument()
-
-    fireEvent.change(screen.getByLabelText('Nombre de la experiencia'), { target: { value: 'Yoga en la playa' } })
-    fireEvent.change(screen.getByLabelText('Categoría'), { target: { value: 'Playa' } })
-    fireEvent.change(screen.getByLabelText('Departamento'), { target: { value: 'La Libertad' } })
-    fireEvent.change(screen.getByLabelText('Municipio'), { target: { value: 'Tamanique' } })
-    fireEvent.change(screen.getByLabelText('Precio por persona (USD)'), { target: { value: '25' } })
-    fireEvent.change(screen.getByLabelText('Capacidad máxima'), { target: { value: '10' } })
-    fireEvent.change(screen.getByLabelText('Descripción'), { target: { value: 'Yoga frente al mar.' } })
-
-    expect(screen.getByText(/0 de 3 fotos mínimas/)).toBeInTheDocument()
-    expect(publish).toBeDisabled()
-    expect(screen.getByText(/Mínimo 3 fotos/)).toHaveTextContent('pendiente')
-
-    const files = ['a.jpg', 'b.jpg', 'c.png'].map(
-      (name) => new File(['x'], name, { type: name.endsWith('png') ? 'image/png' : 'image/jpeg' }),
-    )
-    fireEvent.change(screen.getByLabelText(/Agregar imágenes/), { target: { files } })
-    expect(screen.getByText(/3 fotos · Máximo 8 por experiencia/)).toBeInTheDocument()
-    // Faltaba la ubicación: sigue deshabilitado.
-    expect(publish).toBeDisabled()
-
-    // Fuera de El Salvador no cuenta.
-    fireEvent.change(screen.getByLabelText('Latitud'), { target: { value: '40.4' } })
-    fireEvent.change(screen.getByLabelText('Longitud'), { target: { value: '-3.7' } })
-    expect(screen.getByRole('alert')).toHaveTextContent('fuera de El Salvador')
-    expect(publish).toBeDisabled()
-
-    fireEvent.change(screen.getByLabelText('Latitud'), { target: { value: '13.49' } })
-    fireEvent.change(screen.getByLabelText('Longitud'), { target: { value: '-89.38' } })
-    expect(publish).toBeEnabled()
-
-    fireEvent.click(publish)
-    expect(screen.getByRole('status')).toHaveTextContent('«Yoga en la playa» quedó publicada.')
-    expect(readSaved('experiences')).toContainEqual(
-      expect.objectContaining({ title: 'Yoga en la playa', status: 'Publicada', photoCount: 3, lat: 13.49, lng: -89.38 }),
-    )
-  })
-
-  it('permite elegir otra foto como portada y reordenarlas', () => {
-    setRoleSession('OPERADOR')
-    renderAt('/operador/experiencias/nueva')
-
-    const files = ['a.jpg', 'b.jpg', 'c.jpg'].map((name) => new File(['x'], name, { type: 'image/jpeg' }))
-    fireEvent.change(screen.getByLabelText(/Agregar imágenes/), { target: { files } })
-
-    const slots = () => screen.getAllByRole('listitem').filter((item) => item.className.includes('h-32'))
-    expect(within(slots()[0]).getByText('Portada')).toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Hacer portada c.jpg' }))
-    expect(within(slots()[0]).getByText('Portada')).toBeInTheDocument()
-    expect(within(slots()[0]).getByRole('button', { name: 'Quitar c.jpg' })).toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Mover c.jpg después' }))
-    expect(within(slots()[1]).getByRole('button', { name: 'Quitar c.jpg' })).toBeInTheDocument()
-  })
-
-  it('desactiva una experiencia con confirmación y permite reactivarla', () => {
-    setRoleSession('OPERADOR')
-    renderAt('/operador/experiencias')
-
-    fireEvent.click(screen.getByRole('button', { name: 'Desactivar Atardecer y surf en El Tunco' }))
-    const dialog = screen.getByRole('dialog')
-    expect(within(dialog).getByText('¿Desactivar esta experiencia?')).toBeInTheDocument()
-
-    // Cancelar no cambia nada.
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }))
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Desactivar Atardecer y surf en El Tunco' }))
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Desactivar' }))
-
-    expect(screen.getByRole('status')).toHaveTextContent('«Atardecer y surf en El Tunco» quedó desactivada.')
-    expect(readSaved('experiences').find((item) => item.id === 1)).toMatchObject({
-      status: 'Desactivada',
-      previousStatus: 'Publicada',
+  it('permite al turista ver su historial de reservas y abrir modal de cancelación con cálculo de reembolso', async () => {
+    setSession('VISITANTE')
+    api.post.mockResolvedValueOnce({
+      data: {
+        id: 'res-1',
+        reservationCode: 'RSV-2026-ABC123',
+        status: 'CANCELADA',
+        refund: { refundCode: 'REF-2026-999999', percentage: 100, amount: 90, status: 'EN_PROCESO' },
+      },
     })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Reactivar Atardecer y surf en El Tunco' }))
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Reactivar' }))
-    expect(readSaved('experiences').find((item) => item.id === 1).status).toBe('Publicada')
-  })
+    renderApp('/turista/mi-actividad/reservas')
 
-  it('valida y guarda la configuración del negocio', async () => {
-    setRoleSession('OPERADOR')
-    renderAt('/operador/configuracion')
+    expect(await screen.findByText('RSV-2026-ABC123')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar reserva' }))
 
-    fireEvent.change(screen.getByLabelText('Departamento'), { target: { value: 'Santa Ana' } })
-    expect(screen.getByLabelText('Municipio')).toHaveValue('')
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
-    expect(await screen.findByText('Elige el municipio.')).toBeInTheDocument()
-    expect(readSaved('profile')).toBeNull()
+    expect(await screen.findByText(/corresponde reembolso del 100 %/i)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar cancelación' }))
 
-    fireEvent.change(screen.getByLabelText('Municipio'), { target: { value: 'Coatepeque' } })
-    fireEvent.change(screen.getByLabelText('Correo del negocio'), { target: { value: 'no-es-correo' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
-    expect(await screen.findByText('Escribe un correo válido.')).toBeInTheDocument()
-
-    fireEvent.change(screen.getByLabelText('Correo del negocio'), { target: { value: 'hola@volcan.com' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
-    expect(await screen.findByText('Cambios guardados en este navegador.')).toBeInTheDocument()
-    expect(readSaved('profile')).toMatchObject({
-      department: 'Santa Ana',
-      municipality: 'Coatepeque',
-      email: 'hola@volcan.com',
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith('/reservations/res-1/cancel', { reason: '' })
     })
   })
 
-  it('rechaza un logo que no es JPG o PNG', () => {
-    setRoleSession('OPERADOR')
-    renderAt('/operador/configuracion')
+  it('permite al operador gestionar sus experiencias, reservas y configuración de empresa', async () => {
+    setSession('OPERADOR')
+    renderApp('/operador/experiencias')
+    expect(await screen.findByText('Surf al atardecer en El Tunco')).toBeInTheDocument()
 
-    fireEvent.change(screen.getByLabelText(/Agregar logo|Reemplazar logo/), {
-      target: { files: [new File(['x'], 'logo.gif', { type: 'image/gif' })] },
-    })
-    expect(screen.getByRole('alert')).toHaveTextContent('no es JPG ni PNG')
+    cleanup()
+    renderApp('/operador/configuracion')
+    expect(await screen.findByDisplayValue('Olas de El Tunco')).toBeInTheDocument()
   })
 
-  it('modifica una reserva validando viajeros y recalculando el total', () => {
-    setRoleSession('OPERADOR')
-    renderAt('/operador/reservas')
-
-    fireEvent.click(screen.getByRole('button', { name: 'Modificar reserva RS-2047' }))
-    const dialog = screen.getByRole('dialog')
-    fireEvent.change(within(dialog).getByLabelText('Viajeros'), { target: { value: '0' } })
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Guardar cambios' }))
-    expect(within(dialog).getByRole('alert')).toHaveTextContent('al menos 1 viajero')
-
-    fireEvent.change(within(dialog).getByLabelText('Viajeros'), { target: { value: '3' } })
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Guardar cambios' }))
-    expect(screen.getByRole('status')).toHaveTextContent('Reserva RS-2047 modificada')
-    expect(readSaved('reservations').find((item) => item.id === 'RS-2047')).toMatchObject({ guests: 3, total: 84 })
+  it('permite al admin listar y acceder a la moderación de experiencias', async () => {
+    setSession('ADMIN')
+    renderApp('/admin/experiencias')
+    expect(await screen.findByText('Surf al atardecer en El Tunco')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Moderar' })).toHaveAttribute('href', '/admin/experiencias/exp-1')
   })
 
-  it('cancela una reserva con motivo, calcula el reembolso y permite marcarlo como realizado', () => {
-    setRoleSession('OPERADOR')
-    renderAt('/operador/reservas')
-
-    // RS-2048 empieza en unas 30 h: reembolso del 50 % de 70 USD.
-    fireEvent.click(screen.getByRole('button', { name: 'Cancelar reserva RS-2048' }))
-    const dialog = screen.getByRole('dialog')
-    expect(within(dialog).getByText(/Reembolso del 50 %/)).toHaveTextContent('$35')
-
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancelar reserva' }))
-    expect(within(dialog).getByRole('alert')).toHaveTextContent('Elige el motivo')
-
-    fireEvent.change(within(dialog).getByLabelText('Motivo'), { target: { value: 'El viajero lo pidió' } })
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancelar reserva' }))
-
-    expect(screen.getByRole('status')).toHaveTextContent('Reserva RS-2048 cancelada')
-    expect(readSaved('reservations').find((item) => item.id === 'RS-2048')).toMatchObject({
-      status: 'Cancelada',
-      cancelReason: 'El viajero lo pidió',
-    })
-    expect(readSaved('refunds')).toEqual([
-      expect.objectContaining({ reservationId: 'RS-2048', percent: 50, amount: 35, status: 'En proceso' }),
-    ])
-
-    fireEvent.click(screen.getByRole('link', { name: /Ver ticket de reembolso REF-\d{4}-000001/ }))
-    expect(screen.getByRole('heading', { name: /REF-\d{4}-000001/ })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Marcar como realizado' }))
-    expect(screen.getByRole('status')).toHaveTextContent('ya fue marcado como realizado')
-    expect(readSaved('refunds')[0].status).toBe('Realizado')
-  })
-
-  it('no ofrece reembolso si faltan menos de 24 h', () => {
-    setRoleSession('OPERADOR')
-    renderAt('/operador/reservas')
-
-    // RS-2046 empieza en unas 5 h.
-    fireEvent.click(screen.getByRole('button', { name: 'Cancelar reserva RS-2046' }))
-    expect(within(screen.getByRole('dialog')).getByText(/no genera reembolso/)).toBeInTheDocument()
-  })
-
-  it('cancela una sesión con motivo y deja pendientes de decisión las reservas afectadas', () => {
-    setRoleSession('OPERADOR')
-    const start = new Date(2026, 10, 21, 15, 0).toISOString()
-    localStorage.setItem(
-      'rutasv:operator:3f2504e0-4f89-11d3-9a0c-0305e82c3301:reservations',
-      JSON.stringify([
-        { id: 'RS-1', guest: 'Ana Prueba', experience: 'Atardecer y surf en El Tunco', experienceId: 1, date: '', startsAt: start, guests: 2, status: 'Confirmada' },
-      ]),
-    )
-    renderAt('/operador/cupos')
-
-    fireEvent.click(screen.getByRole('button', { name: 'Cancelar sesión de las 15:00' }))
-    const dialog = screen.getByRole('dialog')
-    expect(within(dialog).getByText(/Ana Prueba/)).toBeInTheDocument()
-
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancelar sesión' }))
-    expect(within(dialog).getByRole('alert')).toHaveTextContent('El motivo es obligatorio')
-
-    fireEvent.change(within(dialog).getByLabelText('Motivo'), { target: { value: 'Mar picado' } })
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancelar sesión' }))
-
-    expect(screen.getByRole('status')).toHaveTextContent('1 reserva quedó pendiente de decisión')
-    expect(readSaved('availability').find((item) => item.id === 'availability-3')).toMatchObject({ closed: true, available: 0 })
-    expect(readSaved('reservations')[0]).toMatchObject({ status: 'Pendiente de decisión', cancelReason: 'Mar picado' })
-  })
-
-  it('avisa al operador con el correo sin verificar', () => {
-    const token = createMockJwt({
-      sub: '3f2504e0-4f89-11d3-9a0c-0305e82c3301',
-      email: 'operador@rutasv.com',
-      'http://schemas.microsoft.com/ws/2008/06/identity/claims/role': 'OPERADOR',
-      email_verified: 'false',
-      exp: 4102444800,
-    })
-    localStorage.setItem('token', token)
-    renderAt('/operador')
-    expect(screen.getByText('Verifica tu correo para recibir avisos.')).toBeInTheDocument()
-  })
-
-  it('el admin lista las experiencias, las retira con motivo y las restaura', () => {
-    setRoleSession('ADMIN')
-    renderAt('/admin/experiencias')
-
-    expect(screen.getByRole('heading', { name: 'Experiencias' })).toBeInTheDocument()
-    // Lista el catálogo público, no datos genéricos del operador.
-    expect(screen.getByText('Surf al atardecer en El Tunco')).toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText('Filtrar por estado'), { target: { value: 'Borrador' } })
-    expect(screen.queryByText('Surf al atardecer en El Tunco')).not.toBeInTheDocument()
-    expect(screen.getByText('Ninguna experiencia coincide con tu búsqueda')).toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText('Filtrar por estado'), { target: { value: 'todos' } })
-
-    fireEvent.click(screen.getByRole('link', { name: /Del cafetal a tu taza en Apaneca/ }))
-    expect(screen.getByRole('heading', { name: 'Del cafetal a tu taza en Apaneca' })).toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Retirar experiencia' }))
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirmar' }))
-    expect(within(screen.getByRole('dialog')).getByRole('alert')).toHaveTextContent('El motivo es obligatorio')
-
-    fireEvent.change(within(screen.getByRole('dialog')).getByLabelText('Motivo'), { target: { value: 'Fotos engañosas' } })
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirmar' }))
-    expect(screen.getByRole('status')).toHaveTextContent('Experiencia retirada')
-    expect(screen.getByRole('note')).toHaveTextContent('Fotos engañosas')
-
-    fireEvent.click(screen.getByRole('button', { name: 'Restaurar experiencia' }))
-    fireEvent.change(within(screen.getByRole('dialog')).getByLabelText('Motivo'), { target: { value: 'Corrigió las fotos' } })
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirmar' }))
-    expect(screen.getByRole('status')).toHaveTextContent('restaurada')
-  })
-
-  it('el admin elimina una foto exigiendo el motivo', () => {
-    setRoleSession('ADMIN')
-    renderAt('/admin/experiencias/catalogo/surf-atardecer-el-tunco')
-
-    expect(screen.getByRole('heading', { name: 'Galería (5)' })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Eliminar foto 2' }))
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirmar' }))
-    expect(within(screen.getByRole('dialog')).getByRole('alert')).toHaveTextContent('El motivo es obligatorio')
-    fireEvent.change(within(screen.getByRole('dialog')).getByLabelText('Motivo'), { target: { value: 'Contenido ajeno' } })
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirmar' }))
-    expect(screen.getByRole('heading', { name: 'Galería (4)' })).toBeInTheDocument()
-  })
-
-  it('no crea la misma experiencia varias veces al volver a enviar', () => {
-    setRoleSession('OPERADOR')
-    renderAt('/operador/experiencias/nueva')
-
-    fireEvent.change(screen.getByLabelText('Nombre de la experiencia'), { target: { value: 'Solo una vez' } })
-    const draft = screen.getByRole('button', { name: 'Guardar borrador' })
-    fireEvent.click(draft)
-    fireEvent.click(draft)
-
-    expect(readSaved('experiences').filter((item) => item.title === 'Solo una vez')).toHaveLength(1)
-  })
-
-  it('rechaza archivos que no son JPG o PNG', () => {
-    setRoleSession('OPERADOR')
-    renderAt('/operador/experiencias/nueva')
-
-    fireEvent.change(screen.getByLabelText(/Agregar imágenes/), {
-      target: { files: [new File(['x'], 'documento.pdf', { type: 'application/pdf' })] },
-    })
-
-    expect(screen.getByRole('alert')).toHaveTextContent('no es JPG ni PNG')
-  })
-
-  it('carga y guarda los cambios al editar una experiencia', () => {
-    setRoleSession('OPERADOR')
-    renderAt('/operador/experiencias/nueva?editar=1')
-
-    expect(screen.getByRole('heading', { name: 'Editar experiencia' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Departamento')).toHaveValue('La Libertad')
-    fireEvent.change(screen.getByLabelText('Nombre de la experiencia'), {
-      target: { value: 'Surf al atardecer' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar borrador' }))
-
-    expect(readSaved('experiences').find((item) => item.id === 1).title).toBe(
-      'Surf al atardecer',
-    )
-    expect(screen.getByRole('status')).toHaveTextContent('Cambios guardados en «Surf al atardecer».')
-  })
-
-  it('muestra cupos y filtra reservas por estado', () => {
-    setRoleSession('OPERADOR')
-    const { unmount } = renderAt('/operador/calendario')
-    expect(screen.getByRole('heading', { name: 'Cupos' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /agregar fecha/i })).toBeInTheDocument()
-
-    unmount()
-    renderAt('/operador/reservas')
-    expect(screen.getByRole('heading', { name: 'Historial de Reservas' })).toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText('Filtrar reservas por estado'), { target: { value: 'Pendiente' } })
-    expect(screen.getByText('Daniel Rivera')).toBeInTheDocument()
-    expect(screen.queryByText('María López')).not.toBeInTheDocument()
-  })
-
-  it('muestra el calendario de cupos con el detalle del día seleccionado', () => {
-    setRoleSession('OPERADOR')
-    renderAt('/operador/cupos')
-
-    const calendar = screen.getByRole('region', { name: 'Calendario de disponibilidad' })
-    expect(within(calendar).getByRole('heading', { name: /noviembre de 2026/i })).toBeInTheDocument()
-    expect(within(calendar).getByRole('button', { name: '14 de noviembre, 6 de 8 cupos' })).toBeInTheDocument()
-    expect(within(calendar).getByRole('button', { name: '2 de noviembre, sin sesiones' })).toBeInTheDocument()
-
-    fireEvent.click(within(calendar).getByRole('button', { name: '21 de noviembre, 4 de 8 cupos' }))
-    const detail = screen.getByRole('region', { name: 'Fecha seleccionada' })
-    expect(within(detail).getByText(/sábado, 21 de noviembre de 2026/i)).toBeInTheDocument()
-    expect(within(detail).getByText('4 de 8 espacios disponibles')).toBeInTheDocument()
-
-    fireEvent.click(within(detail).getByRole('button', { name: 'Editar cupos' }))
-    expect(screen.getByLabelText('Cupos disponibles')).toHaveValue(4)
-
-    fireEvent.click(within(calendar).getByRole('button', { name: 'Siguiente ›' }))
-    expect(within(calendar).getByRole('heading', { name: /diciembre de 2026/i })).toBeInTheDocument()
-  })
-
-  it('el resumen del operador muestra el calendario de disponibilidad', () => {
-    setRoleSession('OPERADOR')
-    renderAt('/operador')
-
-    expect(screen.getByRole('region', { name: 'Calendario de disponibilidad' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /editar cupos/i })).toHaveAttribute('href', '/operador/cupos')
-  })
-
-  it('permite añadir una fecha, hora y cupos disponibles', () => {
-    setRoleSession('OPERADOR')
-    renderAt('/operador/cupos')
-    fireEvent.click(screen.getByRole('button', { name: '+ Agregar fecha' }))
-    fireEvent.change(screen.getByLabelText('Día'), { target: { value: '2026-12-10' } })
-    fireEvent.change(screen.getByLabelText('Hora'), { target: { value: '10:30' } })
-    fireEvent.change(screen.getByLabelText('Capacidad total'), { target: { value: '12' } })
-    fireEvent.change(screen.getByLabelText('Cupos disponibles'), { target: { value: '10' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar cupos' }))
-
-    expect(readSaved('availability')).toContainEqual(
-      expect.objectContaining({
-        date: '2026-12-10',
-        time: '10:30',
-        available: 10,
-        capacity: 12,
-      }),
-    )
-  })
-
-  it('incluye las secciones de reseñas y configuración del operador', () => {
-    setRoleSession('OPERADOR')
-    const { unmount } = renderAt('/operador/resenas')
-    expect(screen.getByRole('heading', { name: 'Reseñas' })).toBeInTheDocument()
-    expect(screen.getByText(/una experiencia increíble/i)).toBeInTheDocument()
-    fireEvent.click(screen.getAllByRole('button', { name: 'Responder' })[0])
-    expect(screen.getAllByLabelText('Respuesta pública')[0]).toBeVisible()
-    fireEvent.change(screen.getAllByLabelText('Respuesta pública')[0], {
-      target: { value: '¡Gracias por visitarnos!' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar respuesta' }))
-    expect(readSaved('reviews')[0].reply).toBe('¡Gracias por visitarnos!')
-
-    unmount()
-    renderAt('/operador/configuracion')
-    expect(screen.getByRole('heading', { name: 'Configuración' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Datos de contacto' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Avisos de reservas')).toBeInTheDocument()
-  })
-
-  it('muestra el formulario de inicio de sesión en /login', () => {
-    renderAt('/login')
-    expect(
-      screen.getByRole('heading', { name: /qué bueno verte de nuevo/i }),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByRole('button', { name: /iniciar sesión/i }),
-    ).toBeInTheDocument()
-  })
-
-  it('mantiene el login separado del flujo de verificación', () => {
-    const { container } = renderAt('/login')
-    const page = within(container)
-
-    fireEvent.change(container.querySelector('#login-email'), {
-      target: { value: 'ana@correo.com' },
-    })
-    fireEvent.change(container.querySelector('#login-password'), {
-      target: { value: 'password' },
-    })
-    fireEvent.click(page.getByRole('button', { name: /iniciar sesión/i }))
-
-    expect(
-      page.getByRole('heading', { name: /qué bueno verte de nuevo/i }),
-    ).toBeInTheDocument()
-    expect(page.queryByRole('heading', { name: /verifica tu correo/i })).not.toBeInTheDocument()
-  })
-
-  it('abre el registro desde el botón superior del login', () => {
-    const { container } = renderAt('/login')
-    fireEvent.click(within(container).getByRole('link', { name: /registro/i }))
-
-    expect(
-      within(container).getByRole('heading', { name: /crea tu cuenta/i }),
-    ).toBeInTheDocument()
-  })
-
-  it('valida los campos obligatorios en el formulario de registro', () => {
-    const { container } = renderAt('/registro')
-
-    fireEvent.click(within(container).getByRole('button', { name: /crear cuenta/i }))
-
-    expect(within(container).getByText('Ingresa tu nombre.')).toBeInTheDocument()
-    expect(within(container).getByText('Ingresa tu apellido.')).toBeInTheDocument()
-    expect(within(container).getByText('Ingresa tu correo electrónico.')).toBeInTheDocument()
-  })
-
-  it('renderiza la vista de verificación en /verify-email y autorrellena el token desde ?token=', () => {
-    const { container } = renderAt('/verify-email?token=abc123token')
-
-    expect(
-      within(container).getByRole('heading', { name: /verifica tu correo/i }),
-    ).toBeInTheDocument()
-    expect(
-      within(container).getByLabelText(/token de verificación/i),
-    ).toHaveValue('abc123token')
-  })
-
-  it('muestra resultados de verificación aceptada y rechazada', () => {
-    const { unmount } = renderAt('/registro/verificacion/aceptada')
-    expect(screen.getByRole('heading', { name: /correo verificado/i })).toBeInTheDocument()
-
-    unmount()
-    renderAt('/registro/verificacion/rechazada')
-    expect(screen.getByRole('heading', { name: /no se pudo verificar/i })).toBeInTheDocument()
-  })
-
-  it('muestra 404 en rutas desconocidas', () => {
-    renderAt('/no-existe')
-    expect(
-      screen.getByRole('heading', { name: /página no encontrada/i }),
-    ).toBeInTheDocument()
+  it('muestra página 404 para rutas desconocidas', () => {
+    renderApp('/ruta-que-no-existe')
+    expect(screen.getByRole('heading', { name: /página no encontrada/i })).toBeInTheDocument()
   })
 })

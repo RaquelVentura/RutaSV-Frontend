@@ -1,67 +1,16 @@
 // Panel del operador: contiene la barra de navegación y el contenido de cada sección.
 
-import { Link, NavLink, Outlet } from 'react-router-dom'
-import UserMenu from '../../components/UserMenu.jsx'
+import { Link, Outlet } from 'react-router-dom'
+import OperatorHeader from '../../components/operator/OperatorHeader.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
-import { getUserMenuItems, getUserMenuLabel } from '../../lib/userMenu.js'
-
-const navigation = [
-  { to: '/operador', label: 'Resumen', end: true },
-  { to: '/operador/experiencias', label: 'Mis experiencias' },
-  { to: '/operador/cupos', label: 'Cupos' },
-  { to: '/operador/reservas', label: 'Historial de Reservas' },
-  { to: '/operador/resenas', label: 'Reseñas' },
-  { to: '/operador/configuracion', label: 'Configuración' },
-]
-
-// Enlaces del encabezado: sin forma de botón; el hover y el subrayado de la
-// sección activa los distinguen (igual que en el panel del admin).
-function NavigationLink({ item }) {
-  return (
-    <NavLink
-      to={item.to}
-      end={item.end}
-      className={({ isActive }) =>
-        `rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
-          isActive
-            ? 'text-brand underline decoration-2 underline-offset-8'
-            : 'text-ink hover:bg-canvas hover:text-brand'
-        }`
-      }
-    >
-      {item.label}
-    </NavLink>
-  )
-}
 
 function OperatorLayout() {
-  const { user, logout } = useAuth()
+  const { user } = useAuth()
 
   return (
     <div className="min-h-screen w-full bg-canvas text-ink">
       <div className="min-h-screen w-full bg-canvas">
-        <header className="border-b border-black/10 bg-white">
-          <div className="flex w-full flex-wrap items-center gap-x-6 gap-y-2 px-5 py-3 md:px-8 lg:px-12 2xl:px-16">
-            <Link to="/" className="text-[28px] font-extrabold tracking-tight text-brand">
-              RutaSV
-            </Link>
-
-            <nav aria-label="Navegación del operador" className="flex flex-wrap items-center gap-1">
-              {navigation.map((item) => (
-                <NavigationLink key={item.to} item={item} />
-              ))}
-            </nav>
-
-            <div className="ml-auto">
-              <UserMenu
-                label={getUserMenuLabel(user)}
-                items={getUserMenuItems(user)}
-                onLogout={logout}
-                className="max-w-[65%] md:max-w-sm"
-              />
-            </div>
-          </div>
-        </header>
+        <OperatorHeader />
 
         {user && !user.emailVerified && (
           <div role="status" className="border-b border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-900 md:px-8 lg:px-12 2xl:px-16">

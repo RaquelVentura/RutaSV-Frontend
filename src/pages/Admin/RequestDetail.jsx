@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useLocation, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import AdminCard from '../../components/admin/AdminCard.jsx'
 import Dialog from '../../components/admin/Dialog.jsx'
 import Notice from '../../components/admin/Notice.jsx'
@@ -18,6 +18,10 @@ import {
   reviewOperatorRequest,
   StatusMeta,
 } from '../../lib/operatorRequests.js'
+import { notify } from '../../lib/notify.js'
+
+// Tras rechazar, el aviso se queda visible este tiempo y luego se vuelve a la lista de solicitudes.
+const redirectAfterRejectMs = 5000
 
 function Field({ label, children }) {
   return (
@@ -102,6 +106,7 @@ function DocumentItem({ document, onPreview }) {
 function RequestDetail() {
   const { id } = useParams()
   const location = useLocation()
+  const navigate = useNavigate()
   const initialFromState =
     location.state?.request && String(location.state.request.id) === String(id)
       ? normalizeOperatorRequest(location.state.request)
@@ -116,6 +121,12 @@ function RequestDetail() {
   const [dialog, setDialog] = useState(null)
   const [justReviewed, setJustReviewed] = useState(null)
   const [previewDoc, setPreviewDoc] = useState(null)
+
+  useEffect(() => {
+    if (justReviewed !== 'RECHAZADA') return undefined
+    const timer = setTimeout(() => navigate('/admin/solicitudes'), redirectAfterRejectMs)
+    return () => clearTimeout(timer)
+  }, [justReviewed, navigate])
 
   useEffect(() => {
     let active = true
@@ -239,6 +250,10 @@ function RequestDetail() {
       setRequest(updated)
       setJustReviewed('RECHAZADA')
       setDialog(null)
+      notify.success('Solicitud rechazada. Se notificó al solicitante.', {
+        description: 'Volverás a la lista de solicitudes en unos segundos.',
+        duration: redirectAfterRejectMs,
+      })
     } catch (error) {
       setActionError(
         extractBackendErrorMessage(

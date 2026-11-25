@@ -10,11 +10,8 @@ import { Roles } from '../../lib/roles.js'
 
 const accountLinks = [
   { to: '/perfil', label: 'Mi perfil', end: true },
-  { to: '/mis-reservas', label: 'Mis reservas' },
-  { to: '/favoritos', label: 'Favoritos' },
-  { to: '/perfil/configuracion', label: 'Configuración de la cuenta' },
-  { to: '/perfil/notificaciones', label: 'Notificaciones' },
-  { to: '/ayuda', label: 'Ayuda' },
+  { to: '/turista/mi-actividad/reservas', label: 'Mis reservas' },
+  { to: '/turista/mi-actividad/favoritos', label: 'Favoritos' },
 ]
 
 const roleTones = {

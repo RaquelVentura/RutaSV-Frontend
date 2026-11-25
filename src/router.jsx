@@ -3,7 +3,6 @@ import ProtectedRoute from './components/ProtectedRoute.jsx'
 import AdminLayout from './layouts/AdminLayout.jsx'
 import AuthLayout from './layouts/AuthLayout.jsx'
 import MainLayout from './layouts/MainLayout.jsx'
-import TuristaLayout from './layouts/TuristaLayout.jsx'
 import { Roles } from './lib/roles.js'
 import AdminDashboard from './pages/Admin/AdminDashboard.jsx'
 import AdminExperienceDetail from './pages/Admin/AdminExperienceDetail.jsx'
@@ -37,7 +36,6 @@ import ActivityReservations from './pages/Tourist/ActivityReservations.jsx'
 import CompanyProfile from './pages/Companies/CompanyProfile.jsx'
 import ExperienceDetail from './pages/Experiences/ExperienceDetail.jsx'
 import ExperienceExplorer from './pages/Experiences/ExperienceExplorer.jsx'
-import Explorer from './pages/Tourist/Explorer.jsx'
 import Reservation from './pages/Tourist/Reservation.jsx'
 import ReservationConfirmation from './pages/Tourist/ReservationConfirmation.jsx'
 
@@ -71,31 +69,13 @@ function AppRoutes() {
           <Route path="solicitudes" element={<RequestsQueue />} />
           <Route path="operadores" element={<OperatorsList />} />
           <Route path="experiencias" element={<AdminExperiences />} />
+          <Route path="experiencias/:id" element={<AdminExperienceDetail />} />
           <Route path="experiencias/:owner/:id" element={<AdminExperienceDetail />} />
           <Route
             path="solicitudes-operador"
             element={<Navigate to="/admin/solicitudes" replace />}
           />
           <Route path="solicitudes/:id" element={<RequestDetail />} />
-        </Route>
-      </Route>
-
-      {/* Vistas de turista: explorar es público; reservar y Mi actividad requieren sesión */}
-      <Route path="/turista" element={<TuristaLayout />}>
-        <Route index element={<Navigate to="explorar" replace />} />
-        <Route path="explorar" element={<Explorer />} />
-        <Route element={<ProtectedRoute />}>
-          <Route path="reservar" element={<Reservation />} />
-          <Route
-            path="reservar/confirmacion"
-            element={<ReservationConfirmation />}
-          />
-          <Route
-            path="mi-actividad"
-            element={<Navigate to="reservas" replace />}
-          />
-          <Route path="mi-actividad/reservas" element={<ActivityReservations />} />
-          <Route path="mi-actividad/favoritos" element={<ActivityFavorites />} />
         </Route>
       </Route>
 
@@ -115,17 +95,36 @@ function AppRoutes() {
         />
       </Route>
 
-      {/* Rutas públicas y de visitante autenticado bajo MainLayout */}
+      {/* Rutas públicas y de visitante autenticado unificadas bajo MainLayout */}
       <Route element={<MainLayout />}>
         <Route path="/" element={<Home />} />
         <Route path="/experiencias" element={<ExperienceExplorer />} />
         <Route path="/experiencias/:slug" element={<ExperienceDetail />} />
         <Route path="/empresas/:slug" element={<CompanyProfile />} />
+        <Route path="/turista" element={<Navigate to="/experiencias" replace />} />
+        <Route path="/turista/explorar" element={<Navigate to="/experiencias" replace />} />
         <Route path="/auth/login" element={<Navigate to="/login" replace />} />
         <Route
           path="/auth/register"
           element={<Navigate to="/registro" replace />}
         />
+
+        {/* Flujo de reservación y actividad del turista (unificado bajo MainLayout) */}
+        <Route element={<ProtectedRoute />}>
+          <Route path="/turista/reservar" element={<Reservation />} />
+          <Route
+            path="/turista/reservar/confirmacion"
+            element={<ReservationConfirmation />}
+          />
+          <Route
+            path="/turista/mi-actividad"
+            element={<Navigate to="/turista/mi-actividad/reservas" replace />}
+          />
+          <Route path="/turista/mi-actividad/reservas" element={<ActivityReservations />} />
+          <Route path="/turista/mi-actividad/favoritos" element={<ActivityFavorites />} />
+          <Route path="/mis-reservas" element={<Navigate to="/turista/mi-actividad/reservas" replace />} />
+          <Route path="/favoritos" element={<Navigate to="/turista/mi-actividad/favoritos" replace />} />
+        </Route>
 
         {/* Estado y detalle de solicitud de operador */}
         <Route

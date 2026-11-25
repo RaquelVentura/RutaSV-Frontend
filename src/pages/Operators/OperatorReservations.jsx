@@ -1,415 +1,503 @@
-//panel de  historial dereservas
-
-import { useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import Dialog from '../../components/admin/Dialog.jsx'
 import FilterSelect from '../../components/admin/FilterSelect.jsx'
-import { useAuth } from '../../context/AuthContext.jsx'
-import { formatCurrency, formatDateTime, refundPercentage } from './operatorData.js'
-import { readOperatorCollection, saveOperatorCollection } from './operatorRepository.js'
-import ReservationStatus from './ReservationStatus.jsx'
+import Pill from '../../components/admin/Pill.jsx'
+import {
+  cancelReservation,
+  completeReservation,
+  confirmReservation,
+  createInPersonReservation,
+  getMyAvailabilities,
+  getOperatorReservations,
+  rejectReservation,
+} from '../../lib/bookingApi.js'
+import { extractApiError, getMyExperiences } from '../../lib/catalogApi.js'
+import {
+  formatCurrency,
+  formatDateReadable,
+  paymentStatusMeta,
+  reservationStatusMeta,
+} from '../../lib/formatters.js'
+import { notify } from '../../lib/notify.js'
 
 const filterOptions = [
-  { value: 'Todas', label: 'Estado: todas' },
-  { value: 'Pendiente', label: 'Pendiente' },
-  { value: 'Confirmada', label: 'Confirmada' },
-  { value: 'Completada', label: 'Completada' },
-  { value: 'Cancelada', label: 'Cancelada' },
-  { value: 'Pendiente de decisión', label: 'Pendiente de decisión' },
+  { value: '', label: 'Estado: todas' },
+  { value: 'PENDIENTE', label: 'Pendientes' },
+  { value: 'CONFIRMADA', label: 'Confirmadas' },
+  { value: 'PENDIENTE_DECISION', label: 'Pendiente de decisión' },
+  { value: 'COMPLETADA', label: 'Completadas' },
+  { value: 'CANCELADA', label: 'Canceladas' },
+  { value: 'RECHAZADA', label: 'Rechazadas' },
 ]
-
-const fieldClass =
-  'min-h-12 w-full rounded-xl border border-black/15 bg-white px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/15'
-
-const cancelReasons = [
-  'El viajero lo pidió',
-  'Cambio de clima o seguridad',
-  'Experiencia no disponible',
-  'Otro motivo',
-]
-
-function isActive(reservation) {
-  return (
-    (reservation.status === 'Pendiente' || reservation.status === 'Confirmada') &&
-    Boolean(reservation.startsAt) &&
-    new Date(reservation.startsAt).getTime() > Date.now()
-  )
-}
-
-function splitStart(startsAt) {
-  // Fecha y hora locales para los campos del diálogo.
-  const date = new Date(startsAt)
-  const pad = (value) => String(value).padStart(2, '0')
-  return {
-    date: `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`,
-    time: `${pad(date.getHours())}:${pad(date.getMinutes())}`,
-  }
-}
-
-function ModifyDialog({ reservation, experience, sessions, onClose, onConfirm }) {
-  const initial = splitStart(reservation.startsAt)
-  const [date, setDate] = useState(initial.date)
-  const [time, setTime] = useState(initial.time)
-  const [guests, setGuests] = useState(String(reservation.guests))
-  const [error, setError] = useState('')
-
-  const session = sessions.find(
-    (row) => String(row.experienceId) === String(reservation.experienceId) && row.date === date && row.time === time,
-  )
-  const sameSession = date === initial.date && time === initial.time
-  // Cupo en vivo: los espacios de la sesión elegida; si es la misma sesión, los de esta reserva cuentan como libres.
-  const spots = session ? session.available + (sameSession ? reservation.guests : 0) : null
-  const maxGuests = experience?.capacity ?? 20
-
-  function handleSubmit(event) {
-    event.preventDefault()
-    const count = Number(guests)
-    if (!date || !time) return setError('Elige la fecha y la hora.')
-    if (!Number.isInteger(count) || count < 1) return setError('Indica al menos 1 viajero.')
-    if (count > maxGuests) return setError(`Esta experiencia admite hasta ${maxGuests} personas.`)
-    const startsAt = new Date(`${date}T${time}:00`)
-    if (Number.isNaN(startsAt.getTime()) || startsAt.getTime() <= Date.now()) {
-      return setError('La nueva fecha debe ser futura.')
-    }
-    if (session && count > spots) return setError(`Solo hay ${spots} ${spots === 1 ? 'cupo' : 'cupos'} en esa sesión.`)
-    return onConfirm({ date, time, guests: count, startsAt: startsAt.toISOString() })
-  }
-
-  return (
-    <Dialog title="Modificar reserva" onClose={onClose}>
-      <form onSubmit={handleSubmit} noValidate className="mt-4 grid gap-4">
-        <p className="text-sm text-muted">
-          {reservation.guest} · {reservation.experience}
-        </p>
-        <div className="grid grid-cols-2 gap-3">
-          <label className="grid gap-1.5 text-sm font-semibold text-ink" htmlFor="modify-date">
-            Fecha
-            <input id="modify-date" type="date" value={date} onChange={(event) => { setDate(event.target.value); setError('') }} className={fieldClass} />
-          </label>
-          <label className="grid gap-1.5 text-sm font-semibold text-ink" htmlFor="modify-time">
-            Hora
-            <input id="modify-time" type="time" value={time} onChange={(event) => { setTime(event.target.value); setError('') }} className={fieldClass} />
-          </label>
-        </div>
-        <label className="grid gap-1.5 text-sm font-semibold text-ink" htmlFor="modify-guests">
-          Viajeros
-          <input id="modify-guests" type="number" min="1" max={maxGuests} value={guests} onChange={(event) => { setGuests(event.target.value); setError('') }} className={fieldClass} />
-        </label>
-        <p className="rounded-xl bg-info-soft px-3 py-2 text-xs text-ink" aria-live="polite">
-          {session
-            ? `Cupos disponibles en esa sesión: ${spots}.`
-            : 'No hay una sesión cargada en esa fecha y hora: no se puede verificar el cupo.'}
-        </p>
-        <p className="text-xs text-muted">
-          Nuevo total: {formatCurrency((experience?.price ?? 0) * (Number(guests) || 0))}
-        </p>
-        {error && <p role="alert" className="text-sm font-semibold text-danger">{error}</p>}
-        <div className="flex justify-end gap-3">
-          <button type="button" onClick={onClose} className="rounded-xl border border-black/15 px-5 py-2.5 text-sm font-semibold text-ink hover:bg-canvas">
-            Cancelar
-          </button>
-          <button type="submit" className="rounded-xl bg-brand px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-dark">
-            Guardar cambios
-          </button>
-        </div>
-      </form>
-    </Dialog>
-  )
-}
-
-function CancelDialog({ reservation, total, onClose, onConfirm }) {
-  const [reason, setReason] = useState('')
-  const [detail, setDetail] = useState('')
-  const [error, setError] = useState('')
-  const percent = refundPercentage(reservation.startsAt)
-  const amount = (total * percent) / 100
-
-  function handleSubmit(event) {
-    event.preventDefault()
-    if (!reason) return setError('Elige el motivo de la cancelación.')
-    if (reason === 'Otro motivo' && !detail.trim()) return setError('Cuéntanos el motivo.')
-    return onConfirm({ reason: reason === 'Otro motivo' ? detail.trim() : reason, percent, amount })
-  }
-
-  return (
-    <Dialog title="Cancelar reserva" onClose={onClose}>
-      <form onSubmit={handleSubmit} noValidate className="mt-4 grid gap-4">
-        <p className="text-sm text-muted">
-          {reservation.guest} · {reservation.experience} · {formatDateTime(reservation.startsAt)}
-        </p>
-        <label className="grid gap-1.5 text-sm font-semibold text-ink" htmlFor="cancel-reason">
-          Motivo
-          <select id="cancel-reason" value={reason} onChange={(event) => { setReason(event.target.value); setError('') }} className={fieldClass}>
-            <option value="">Selecciona un motivo</option>
-            {cancelReasons.map((item) => (
-              <option key={item}>{item}</option>
-            ))}
-          </select>
-        </label>
-        {reason === 'Otro motivo' && (
-          <label className="grid gap-1.5 text-sm font-semibold text-ink" htmlFor="cancel-detail">
-            Detalle del motivo
-            <textarea id="cancel-detail" rows="3" value={detail} onChange={(event) => { setDetail(event.target.value); setError('') }} className={`${fieldClass} py-3`} />
-          </label>
-        )}
-        <p className={`rounded-xl px-3 py-2 text-sm ${percent === 0 ? 'bg-danger-soft text-danger' : 'bg-info-soft text-ink'}`}>
-          {percent === 0
-            ? 'Faltan menos de 24 h: según la política, esta cancelación no genera reembolso.'
-            : `Reembolso del ${percent} % según la política (${percent === 100 ? '48 h o más' : 'de 24 h a menos de 48 h'} antes): ${formatCurrency(amount)}.`}
-        </p>
-        <p className="text-xs text-muted">El cupo se libera de inmediato y se avisa al viajero.</p>
-        {error && <p role="alert" className="text-sm font-semibold text-danger">{error}</p>}
-        <div className="flex justify-end gap-3">
-          <button type="button" onClick={onClose} className="rounded-xl border border-black/15 px-5 py-2.5 text-sm font-semibold text-ink hover:bg-canvas">
-            Volver
-          </button>
-          <button type="submit" className="rounded-xl bg-danger px-5 py-2.5 text-sm font-bold text-white hover:opacity-90">
-            Cancelar reserva
-          </button>
-        </div>
-      </form>
-    </Dialog>
-  )
-}
 
 function OperatorReservations() {
-  const { user } = useAuth()
-  const [reservations, setReservations] = useState(() => readOperatorCollection(user, 'reservations'))
-  const experiences = useMemo(() => readOperatorCollection(user, 'experiences'), [user])
-  const [sessions, setSessions] = useState(() => readOperatorCollection(user, 'availability'))
-  const [filter, setFilter] = useState('Todas')
-  const [query, setQuery] = useState('')
-  const [dialog, setDialog] = useState(null)
-  const [notice, setNotice] = useState(null)
+  const [statusFilter, setStatusFilter] = useState('')
+  const [search, setSearch] = useState('')
+  const [reservations, setReservations] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [errorBanner, setErrorBanner] = useState('')
+  const [busyId, setBusyId] = useState('')
 
-  const visibleReservations = useMemo(() => {
-    const term = query.trim().toLocaleLowerCase()
-    return reservations.filter((reservation) => {
-      const matchesFilter = filter === 'Todas' || reservation.status === filter
-      const matchesQuery =
-        !term ||
-        `${reservation.id} ${reservation.guest} ${reservation.experience}`
-          .toLocaleLowerCase()
-          .includes(term)
-      return matchesFilter && matchesQuery
-    })
-  }, [filter, query, reservations])
+  // Modal reserva presencial (RF-O12 / RN-19)
+  const [showInPersonModal, setShowInPersonModal] = useState(false)
+  const [experiences, setExperiences] = useState([])
+  const [availabilities, setAvailabilities] = useState([])
+  const [inPersonForm, setInPersonForm] = useState({
+    experienceId: '',
+    availabilityId: '',
+    peopleCount: '1',
+    contactName: '',
+    contactPhone: '',
+    contactEmail: '',
+    specialNotes: '',
+  })
+  const [submittingInPerson, setSubmittingInPerson] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
 
-  function experienceOf(reservation) {
-    return experiences.find((item) => String(item.id) === String(reservation.experienceId))
+  function loadReservations() {
+    setReloadKey((k) => k + 1)
   }
 
-  function totalOf(reservation) {
-    return reservation.total ?? (experienceOf(reservation)?.price ?? 0) * reservation.guests
-  }
-
-  function sessionKey(reservation, date, time) {
-    return sessions.find(
-      (row) => String(row.experienceId) === String(reservation.experienceId) && row.date === date && row.time === time,
-    )
-  }
-
-  function persist(nextReservations, nextSessions, text, nextRefunds) {
-    try {
-      saveOperatorCollection(user, 'reservations', nextReservations)
-      if (nextSessions) saveOperatorCollection(user, 'availability', nextSessions)
-      if (nextRefunds) saveOperatorCollection(user, 'refunds', nextRefunds)
-      setReservations(nextReservations)
-      if (nextSessions) setSessions(nextSessions)
-      setNotice({ type: 'success', text })
-    } catch (error) {
-      setNotice({ type: 'error', text: `No se pudo guardar el cambio: ${error.message}` })
-    }
-    setDialog(null)
-  }
-
-  function confirmModify(reservation, change) {
-    const old = splitStart(reservation.startsAt)
-    let nextSessions = sessions
-    const oldSession = sessionKey(reservation, old.date, old.time)
-    const newSession = sessionKey(reservation, change.date, change.time)
-    if (oldSession || newSession) {
-      nextSessions = sessions.map((row) => {
-        if (row === oldSession) return { ...row, available: Math.min(row.capacity, row.available + reservation.guests) }
-        return row
-      })
-      nextSessions = nextSessions.map((row) =>
-        newSession && row.id === newSession.id ? { ...row, available: Math.max(0, row.available - change.guests) } : row,
-      )
-    }
-    const price = experienceOf(reservation)?.price
-    const updated = reservations.map((item) =>
-      item.id === reservation.id
-        ? {
-            ...item,
-            startsAt: change.startsAt,
-            date: formatDateTime(change.startsAt),
-            guests: change.guests,
-            ...(price ? { total: price * change.guests } : {}),
-          }
-        : item,
-    )
-    persist(updated, nextSessions, `Reserva ${reservation.id} modificada. Se avisó al viajero.`)
-  }
-
-  function confirmCancel(reservation, result) {
-    const old = splitStart(reservation.startsAt)
-    const session = sessionKey(reservation, old.date, old.time)
-    const nextSessions = session
-      ? sessions.map((row) =>
-          row.id === session.id ? { ...row, available: Math.min(row.capacity, row.available + reservation.guests) } : row,
-        )
-      : null
-    const refunds = readOperatorCollection(user, 'refunds')
-    let refund = null
-    if (result.percent > 0) {
-      refund = {
-        id: `REF-${new Date().getFullYear()}-${String(refunds.length + 1).padStart(6, '0')}`,
-        reservationId: reservation.id,
-        guest: reservation.guest,
-        experience: reservation.experience,
-        percent: result.percent,
-        amount: result.amount,
-        total: totalOf(reservation),
-        status: 'En proceso',
-        createdAt: new Date().toISOString(),
+  useEffect(() => {
+    let cancelled = false
+    async function fetchItems() {
+      try {
+        const response = await getOperatorReservations({
+          pageNumber: 1,
+          pageSize: 100,
+          status: statusFilter || undefined,
+          search: search.trim() || undefined,
+        })
+        if (!cancelled) {
+          setErrorBanner('')
+          setReservations(response?.data ?? [])
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setErrorBanner(extractApiError(error, 'No se pudieron cargar las reservas.').message)
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
       }
     }
-    const updated = reservations.map((item) =>
-      item.id === reservation.id
-        ? { ...item, status: 'Cancelada', cancelReason: result.reason, refundId: refund?.id }
-        : item,
-    )
-    persist(
-      updated,
-      nextSessions,
-      refund
-        ? `Reserva ${reservation.id} cancelada. Se generó el ticket ${refund.id} por ${formatCurrency(refund.amount)}.`
-        : `Reserva ${reservation.id} cancelada sin reembolso. El cupo quedó libre.`,
-      refund ? [...refunds, refund] : null,
-    )
+    fetchItems()
+    return () => {
+      cancelled = true
+    }
+  }, [statusFilter, search, reloadKey])
+
+  async function openInPersonModal() {
+    setShowInPersonModal(true)
+    try {
+      const [expRes, slots] = await Promise.all([
+        getMyExperiences({ pageNumber: 1, pageSize: 100 }),
+        getMyAvailabilities(),
+      ])
+      const expItems = expRes?.data ?? []
+      const openSlots = (slots ?? []).filter((s) => s.status === 'ABIERTA' && s.availableSpots > 0)
+      setExperiences(expItems)
+      setAvailabilities(openSlots)
+      const defaultExp = expItems[0]?.id ?? ''
+      const defaultSlot = openSlots.find((s) => s.experienceId === defaultExp)?.id ?? ''
+      setInPersonForm((prev) => ({
+        ...prev,
+        experienceId: defaultExp,
+        availabilityId: defaultSlot,
+      }))
+    } catch (error) {
+      notify.error(extractApiError(error).message)
+    }
   }
 
+  async function handleCreateInPerson(event) {
+    event.preventDefault()
+    if (!inPersonForm.experienceId || !inPersonForm.availabilityId || !inPersonForm.contactName.trim() || !inPersonForm.contactPhone.trim()) {
+      notify.error('Completa experiencia, sesión, nombre y teléfono del visitante.')
+      return
+    }
+    setSubmittingInPerson(true)
+    try {
+      const created = await createInPersonReservation({
+        experienceId: inPersonForm.experienceId,
+        availabilityId: inPersonForm.availabilityId,
+        peopleCount: Number(inPersonForm.peopleCount || 1),
+        contactName: inPersonForm.contactName.trim(),
+        contactPhone: inPersonForm.contactPhone.trim(),
+        contactEmail: inPersonForm.contactEmail.trim() || null,
+        specialNotes: inPersonForm.specialNotes.trim() || null,
+      })
+      notify.success(`Reserva presencial ${created.reservationCode} registrada.`)
+      setShowInPersonModal(false)
+      setInPersonForm({
+        experienceId: '',
+        availabilityId: '',
+        peopleCount: '1',
+        contactName: '',
+        contactPhone: '',
+        contactEmail: '',
+        specialNotes: '',
+      })
+      await loadReservations()
+    } catch (error) {
+      notify.error(extractApiError(error).message)
+    } finally {
+      setSubmittingInPerson(false)
+    }
+  }
+
+  async function handleConfirm(res) {
+    setBusyId(res.id)
+    try {
+      await confirmReservation(res.id)
+      notify.success(`Reserva ${res.reservationCode} confirmada.`)
+      await loadReservations()
+    } catch (error) {
+      notify.error(extractApiError(error).message)
+    } finally {
+      setBusyId('')
+    }
+  }
+
+  async function handleReject(res) {
+    const reason = window.prompt(
+      `Motivo para rechazar la reserva ${res.reservationCode} (generará reembolso automático del 100 %):`,
+      'Sin guía disponible para este horario',
+    )
+    if (!reason || !reason.trim()) return
+    setBusyId(res.id)
+    try {
+      const updated = await rejectReservation(res.id, reason.trim())
+      notify.success(
+        `Reserva rechazada. Ticket de reembolso 100 %: ${updated.refund?.refundCode ?? ''}`,
+      )
+      await loadReservations()
+    } catch (error) {
+      notify.error(extractApiError(error).message)
+    } finally {
+      setBusyId('')
+    }
+  }
+
+  async function handleComplete(res) {
+    setBusyId(res.id)
+    try {
+      await completeReservation(res.id)
+      notify.success(`Reserva ${res.reservationCode} marcada como completada.`)
+      await loadReservations()
+    } catch (error) {
+      notify.error(extractApiError(error).message)
+    } finally {
+      setBusyId('')
+    }
+  }
+
+  async function handleOperatorCancel(res) {
+    const reason = window.prompt(
+      `Motivo para cancelar la reserva ${res.reservationCode} (reembolso del 100 % al visitante):`,
+      'Cancelación operativa',
+    )
+    if (reason === null) return
+    setBusyId(res.id)
+    try {
+      const updated = await cancelReservation(res.id, reason)
+      notify.success(
+        `Reserva cancelada. Ticket de reembolso: ${updated.refund?.refundCode ?? ''}`,
+      )
+      await loadReservations()
+    } catch (error) {
+      notify.error(extractApiError(error).message)
+    } finally {
+      setBusyId('')
+    }
+  }
+
+  const matchingSlots = availabilities.filter((s) => s.experienceId === inPersonForm.experienceId)
+
   return (
-    <div className="space-y-7 lg:space-y-9">
-      <div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-ink">
-          Historial de Reservas
-        </h1>
-        <p className="mt-2 text-sm leading-6 text-muted">
-          Consulta las reservas y los detalles de tus viajeros.
-        </p>
-      </div>
-
-      {notice && (
-        <p
-          role={notice.type === 'error' ? 'alert' : 'status'}
-          className={`rounded-xl border px-4 py-3 text-sm ${
-            notice.type === 'error'
-              ? 'border-red-900/15 bg-red-50 text-red-900'
-              : 'border-emerald-900/15 bg-emerald-50 text-emerald-900'
-          }`}
-        >
-          {notice.text}
-        </p>
-      )}
-
-      <section className="grid gap-4 rounded-2xl border border-black/10 bg-white p-5 shadow-sm md:grid-cols-[minmax(240px,1fr)_auto] md:items-center lg:p-6">
+    <div className="space-y-6">
+      <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <label className="sr-only" htmlFor="reservation-search">Buscar reservas</label>
-          <input
-            id="reservation-search"
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Buscar por viajero o experiencia"
-            className="min-h-12 w-full rounded-xl border border-black/15 bg-white px-4 text-sm text-ink outline-none placeholder:text-muted focus:border-brand focus:ring-2 focus:ring-brand/15"
-          />
+          <p className="text-xs font-bold uppercase tracking-wide text-brand">Gestión de reservas</p>
+          <h1 className="mt-1 text-3xl font-bold text-ink">Reservas recibidas</h1>
+          <p className="mt-1 text-sm text-muted">
+            Confirma, rechaza, completa, cancela o registra reservas presenciales con control de cupos.
+          </p>
         </div>
+        <button
+          type="button"
+          onClick={openInPersonModal}
+          className="rounded-full bg-brand px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-dark"
+        >
+          + Reserva presencial
+        </button>
+      </header>
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <FilterSelect
           label="Filtrar reservas por estado"
           options={filterOptions}
-          value={filter}
-          onChange={(event) => setFilter(event.target.value)}
+          value={statusFilter}
+          onChange={(event) => setStatusFilter(event.target.value)}
           className="min-h-12 md:w-56"
         />
-      </section>
 
-      <section className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3" aria-label="Reservas">
-        {visibleReservations.length ? (
-          visibleReservations.map((reservation) => (
-            <article key={reservation.id} className="flex min-h-48 flex-col justify-between rounded-2xl border border-black/10 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md lg:p-6">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <h2 className="text-base font-bold text-ink">{reservation.guest}</h2>
-                  <p className="mt-1 text-xs text-muted">{reservation.id}</p>
-                </div>
-                <ReservationStatus status={reservation.status} />
-              </div>
-              <p className="mt-4 text-sm font-medium leading-6 text-ink">
-                {reservation.experience}
-              </p>
-              {reservation.status === 'Cancelada' && reservation.cancelReason && (
-                <p className="mt-1 text-xs text-muted">Motivo: {reservation.cancelReason}</p>
-              )}
-              <div className="mt-5 flex items-center justify-between border-t border-black/10 pt-4 text-xs text-muted">
-                <span>{reservation.startsAt ? formatDateTime(reservation.startsAt) : reservation.date}</span>
-                <span>{reservation.guests} viajeros</span>
-              </div>
-              {isActive(reservation) && (
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setDialog({ type: 'modify', reservation })}
-                    aria-label={`Modificar reserva ${reservation.id}`}
-                    className="min-h-10 flex-1 rounded-xl border border-black/15 px-3 text-sm font-semibold text-brand hover:border-brand hover:bg-info-soft"
-                  >
-                    Modificar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDialog({ type: 'cancel', reservation })}
-                    aria-label={`Cancelar reserva ${reservation.id}`}
-                    className="min-h-10 flex-1 rounded-xl border border-black/15 px-3 text-sm font-semibold text-danger hover:bg-danger-soft"
-                  >
-                    Cancelar
-                  </button>
-                </div>
-              )}
-              {reservation.refundId && (
-                <Link
-                  to={`/operador/reservas/reembolso/${reservation.refundId}`}
-                  className="mt-4 text-sm font-semibold text-brand hover:underline"
-                >
-                  Ver ticket de reembolso {reservation.refundId}
-                </Link>
-              )}
-            </article>
-          ))
-        ) : (
-          <div className="rounded-2xl border border-dashed border-black/20 bg-white px-5 py-14 text-center lg:col-span-2 2xl:col-span-3">
-            <p className="font-semibold text-ink">No hay reservas con estos criterios</p>
-            <p className="mt-1 text-sm text-muted">Prueba con otro filtro o búsqueda.</p>
-          </div>
-        )}
-      </section>
-
-      {dialog?.type === 'modify' && (
-        <ModifyDialog
-          reservation={dialog.reservation}
-          experience={experienceOf(dialog.reservation)}
-          sessions={sessions}
-          onClose={() => setDialog(null)}
-          onConfirm={(change) => confirmModify(dialog.reservation, change)}
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar código, visitante o experiencia..."
+          aria-label="Buscar reservas"
+          className="w-full rounded-xl border border-mist bg-surface px-3.5 py-2 text-sm text-ink sm:w-72"
         />
+      </div>
+
+      {errorBanner && (
+        <div role="alert" className="rounded-2xl border border-danger/30 bg-danger-soft p-4 text-sm text-danger">
+          {errorBanner}
+        </div>
       )}
-      {dialog?.type === 'cancel' && (
-        <CancelDialog
-          reservation={dialog.reservation}
-          total={totalOf(dialog.reservation)}
-          onClose={() => setDialog(null)}
-          onConfirm={(result) => confirmCancel(dialog.reservation, result)}
-        />
+
+      {loading ? (
+        <div className="space-y-3">
+          {[1, 2, 3].map((n) => (
+            <div key={n} className="h-28 animate-pulse rounded-2xl border border-mist bg-surface" />
+          ))}
+        </div>
+      ) : reservations.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-mist bg-surface p-12 text-center text-sm text-muted">
+          No se encontraron reservas con los criterios actuales.
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {reservations.map((res) => {
+            const st = reservationStatusMeta[res.status] ?? { label: res.status, tone: 'neutral' }
+            const pay = paymentStatusMeta[res.paymentStatus] ?? { label: res.paymentStatus, tone: 'neutral' }
+            const isBusy = busyId === res.id
+
+            return (
+              <article key={res.id} className="rounded-2xl border border-mist bg-surface p-5">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-mono text-xs font-bold text-brand">
+                        {res.reservationCode}
+                      </span>
+                      <Pill tone={st.tone}>{st.label}</Pill>
+                      <Pill tone={pay.tone}>{pay.label}</Pill>
+                      <span className="rounded-full bg-canvas px-2.5 py-0.5 text-[11px] font-semibold text-muted">
+                        {res.source}
+                      </span>
+                    </div>
+                    <h2 className="text-lg font-bold text-ink">{res.experienceTitle}</h2>
+                    <p className="text-sm text-muted">
+                      <strong className="text-ink">{res.contactName}</strong>
+                      {res.contactEmail ? ` · ${res.contactEmail}` : ''}
+                      {res.contactPhone ? ` · ${res.contactPhone}` : ''}
+                    </p>
+                    <p className="text-xs text-muted">
+                      {formatDateReadable(res.activityDate)} · {res.startTime} · {res.peopleCount}{' '}
+                      {res.peopleCount === 1 ? 'persona' : 'personas'} ·{' '}
+                      <strong className="text-ink">{formatCurrency(res.total, res.currency)}</strong>
+                    </p>
+                    {res.specialNotes && (
+                      <p className="text-xs italic text-muted">Nota: {res.specialNotes}</p>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    {res.status === 'PENDIENTE' && (
+                      <>
+                        <button
+                          type="button"
+                          disabled={isBusy}
+                          onClick={() => handleConfirm(res)}
+                          className="rounded-full bg-brand px-4 py-1.5 text-xs font-bold text-white hover:bg-brand-dark disabled:opacity-50"
+                        >
+                          Confirmar
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isBusy}
+                          onClick={() => handleReject(res)}
+                          className="rounded-full border border-danger/40 px-3.5 py-1.5 text-xs font-semibold text-danger hover:bg-danger-soft disabled:opacity-50"
+                        >
+                          Rechazar
+                        </button>
+                      </>
+                    )}
+                    {res.status === 'CONFIRMADA' && (
+                      <>
+                        <button
+                          type="button"
+                          disabled={isBusy}
+                          onClick={() => handleComplete(res)}
+                          className="rounded-full bg-emerald-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                        >
+                          Completar
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isBusy}
+                          onClick={() => handleOperatorCancel(res)}
+                          className="rounded-full border border-danger/40 px-3.5 py-1.5 text-xs font-semibold text-danger hover:bg-danger-soft disabled:opacity-50"
+                        >
+                          Cancelar (100 %)
+                        </button>
+                      </>
+                    )}
+                    {res.refund && (
+                      <Link
+                        to={`/operador/reservas/reembolso/${res.refund.refundCode}`}
+                        className="rounded-full border border-brand px-3.5 py-1.5 text-xs font-bold text-brand hover:bg-brand hover:text-white"
+                      >
+                        Ticket {res.refund.refundCode}
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              </article>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Modal reserva presencial */}
+      {showInPersonModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Registrar reserva presencial"
+          className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4"
+        >
+          <form
+            onSubmit={handleCreateInPerson}
+            className="w-full max-w-lg space-y-4 rounded-2xl bg-surface p-6 shadow-xl"
+          >
+            <h2 className="text-xl font-bold text-ink">Nueva reserva presencial (RF-O12)</h2>
+            <p className="text-xs text-muted">
+              Descuenta cupos en tiempo real y queda confirmada de inmediato.
+            </p>
+
+            <div>
+              <label htmlFor="ip-exp" className="mb-1 block text-xs font-semibold text-muted">
+                Experiencia *
+              </label>
+              <select
+                id="ip-exp"
+                required
+                value={inPersonForm.experienceId}
+                onChange={(e) => {
+                  const expId = e.target.value
+                  const firstSlot = availabilities.find((s) => s.experienceId === expId)?.id ?? ''
+                  setInPersonForm((prev) => ({ ...prev, experienceId: expId, availabilityId: firstSlot }))
+                }}
+                className="w-full rounded-xl border border-mist bg-canvas px-3 py-2 text-sm text-ink"
+              >
+                <option value="">Selecciona una experiencia</option>
+                {experiences.map((exp) => (
+                  <option key={exp.id} value={exp.id}>
+                    {exp.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="ip-slot" className="mb-1 block text-xs font-semibold text-muted">
+                Sesión disponible *
+              </label>
+              <select
+                id="ip-slot"
+                required
+                value={inPersonForm.availabilityId}
+                onChange={(e) => setInPersonForm((prev) => ({ ...prev, availabilityId: e.target.value }))}
+                className="w-full rounded-xl border border-mist bg-canvas px-3 py-2 text-sm text-ink"
+              >
+                <option value="">Selecciona fecha y hora</option>
+                {matchingSlots.map((slot) => (
+                  <option key={slot.id} value={slot.id}>
+                    {slot.date} · {slot.startTime} ({slot.availableSpots} cupos · ${slot.effectivePrice})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label htmlFor="ip-name" className="mb-1 block text-xs font-semibold text-muted">
+                  Nombre del visitante *
+                </label>
+                <input
+                  id="ip-name"
+                  type="text"
+                  required
+                  value={inPersonForm.contactName}
+                  onChange={(e) => setInPersonForm((prev) => ({ ...prev, contactName: e.target.value }))}
+                  className="w-full rounded-xl border border-mist bg-canvas px-3 py-2 text-sm text-ink"
+                />
+              </div>
+              <div>
+                <label htmlFor="ip-phone" className="mb-1 block text-xs font-semibold text-muted">
+                  Teléfono *
+                </label>
+                <input
+                  id="ip-phone"
+                  type="tel"
+                  required
+                  value={inPersonForm.contactPhone}
+                  onChange={(e) => setInPersonForm((prev) => ({ ...prev, contactPhone: e.target.value }))}
+                  className="w-full rounded-xl border border-mist bg-canvas px-3 py-2 text-sm text-ink"
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label htmlFor="ip-people" className="mb-1 block text-xs font-semibold text-muted">
+                  Personas *
+                </label>
+                <input
+                  id="ip-people"
+                  type="number"
+                  min="1"
+                  required
+                  value={inPersonForm.peopleCount}
+                  onChange={(e) => setInPersonForm((prev) => ({ ...prev, peopleCount: e.target.value }))}
+                  className="w-full rounded-xl border border-mist bg-canvas px-3 py-2 text-sm text-ink"
+                />
+              </div>
+              <div>
+                <label htmlFor="ip-email" className="mb-1 block text-xs font-semibold text-muted">
+                  Correo (opcional)
+                </label>
+                <input
+                  id="ip-email"
+                  type="email"
+                  value={inPersonForm.contactEmail}
+                  onChange={(e) => setInPersonForm((prev) => ({ ...prev, contactEmail: e.target.value }))}
+                  className="w-full rounded-xl border border-mist bg-canvas px-3 py-2 text-sm text-ink"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowInPersonModal(false)}
+                className="rounded-full border border-mist px-4 py-2 text-sm font-semibold text-ink"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={submittingInPerson}
+                className="rounded-full bg-brand px-5 py-2 text-sm font-bold text-white disabled:opacity-50"
+              >
+                {submittingInPerson ? 'Registrando...' : 'Registrar reserva'}
+              </button>
+            </div>
+          </form>
+        </div>
       )}
     </div>
   )

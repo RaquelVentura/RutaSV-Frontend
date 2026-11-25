@@ -8,10 +8,12 @@ import Pagination from '../../components/admin/Pagination.jsx'
 import Pill from '../../components/admin/Pill.jsx'
 import SearchInput from '../../components/admin/SearchInput.jsx'
 import LinkButton from '../../components/LinkButton.jsx'
-import { users } from '../../data/admin.js'
 import useAdminSearch from '../../lib/useAdminSearch.js'
 
 const ALL = 'todos'
+
+// El backend aún no expone un listado de usuarios: no se muestran cuentas de ejemplo.
+const users = []
 
 const roleOptions = [
   { value: ALL, label: 'Rol: todos' },
@@ -93,8 +95,14 @@ function UsersList() {
 
       {visible.length === 0 ? (
         <div className="rounded-2xl border border-mist bg-surface px-6 py-16 text-center">
-          <h2 className="text-sm font-bold text-ink">Ningún usuario coincide con tu búsqueda</h2>
-          <p className="mt-1 text-xs text-muted">Prueba con otros filtros.</p>
+          <h2 className="text-sm font-bold text-ink">
+            {users.length === 0 ? 'Aún no hay usuarios para mostrar' : 'Ningún usuario coincide con tu búsqueda'}
+          </h2>
+          <p className="mt-1 text-xs text-muted">
+            {users.length === 0
+              ? 'El listado se conectará cuando el backend exponga las cuentas de usuario. Mientras tanto puedes crear usuarios.'
+              : 'Prueba con otros filtros.'}
+          </p>
         </div>
       ) : (
         <>
@@ -143,8 +151,8 @@ function UsersList() {
             </ul>
           </div>
           <Pagination
-            summary={`Mostrando 1–${visible.length} de 48 usuarios`}
-            pages={[1, 2, 3]}
+            summary={`Mostrando ${visible.length} de ${users.length} usuarios`}
+            pages={[1]}
           />
         </>
       )}

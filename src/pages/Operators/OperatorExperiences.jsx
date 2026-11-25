@@ -1,219 +1,293 @@
-
-//PANEL DE EXPERIENCIAS OPERADOR 
-
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
-import Dialog from '../../components/admin/Dialog.jsx'
+import { Link } from 'react-router-dom'
 import FilterSelect from '../../components/admin/FilterSelect.jsx'
-import { useAuth } from '../../context/AuthContext.jsx'
-import { formatCurrency } from './operatorData.js'
-import { readOperatorCollection, saveOperatorCollection } from './operatorRepository.js'
+import Pill from '../../components/admin/Pill.jsx'
+import {
+  deleteExperience,
+  extractApiError,
+  getMyExperiences,
+  pauseExperience,
+  publishExperience,
+  resolveAssetUrl,
+} from '../../lib/catalogApi.js'
+import {
+  experienceStatusMeta,
+  formatCurrency,
+  formatDuration,
+} from '../../lib/formatters.js'
+import { notify } from '../../lib/notify.js'
 
-const categoryIcons = {
-  Aventura: '🌊',
-  Naturaleza: '🌿',
-  'Cultura y café': '☕',
-  Gastronomía: '🍽️',
-  Playa: '🏖️',
-}
-
-const statusOptions = [
-  { value: 'Todas', label: 'Estado: todas' },
-  { value: 'Publicada', label: 'Publicada' },
-  { value: 'Borrador', label: 'Borrador' },
-  { value: 'Desactivada', label: 'Desactivada' },
-  { value: 'Retirada', label: 'Retirada' },
+const statusFilters = [
+  { value: '', label: 'Estado: todas' },
+  { value: 'PUBLICADA', label: 'Publicadas' },
+  { value: 'BORRADOR', label: 'Borradores' },
+  { value: 'PAUSADA', label: 'Pausadas' },
+  { value: 'RETIRADA', label: 'Retiradas' },
 ]
 
-const statusStyles = {
-  Publicada: 'bg-cyan-100 text-cyan-800',
-  Borrador: 'bg-stone-100 text-stone-700',
-  Desactivada: 'bg-amber-50 text-amber-800',
-  Retirada: 'bg-danger-soft text-danger',
-}
-
 function OperatorExperiences() {
-  const { user } = useAuth()
-  const [experiences, setExperiences] = useState(() => readOperatorCollection(user, 'experiences'))
-  const [pending, setPending] = useState(null)
-  const [feedback, setFeedback] = useState('')
-  const [query, setQuery] = useState('')
-  const [status, setStatus] = useState('Todas')
-  const location = useLocation()
-  const [initialNotice] = useState(() => location.state?.notice ?? '')
-  const notice = feedback || initialNotice
+  const [statusFilter, setStatusFilter] = useState('')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [experiences, setExperiences] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [errorBanner, setErrorBanner] = useState('')
+  const [missingFieldsAlert, setMissingFieldsAlert] = useState([])
+  const [busyId, setBusyId] = useState('')
+  const [reloadKey, setReloadKey] = useState(0)
 
-  // El aviso se muestra una sola vez: se quita del historial para que no reaparezca al recargar.
+  function loadExperiences() {
+    setReloadKey((k) => k + 1)
+  }
+
   useEffect(() => {
-    if (location.state?.notice) window.history.replaceState({}, '')
-  }, [location.state])
-
-  const filteredExperiences = useMemo(() => {
-    const term = query.trim().toLocaleLowerCase()
-    return experiences.filter((experience) => {
-      const matchesQuery =
-        !term ||
-        `${experience.title} ${experience.location} ${experience.category}`
-          .toLocaleLowerCase()
-          .includes(term)
-      return matchesQuery && (status === 'Todas' || experience.status === status)
-    })
-  }, [experiences, query, status])
-
-  // Desactivar no borra: la experiencia deja de mostrarse a los viajeros y se puede
-  // reactivar, volviendo al estado que tenía.
-  function confirmChange() {
-    const target = pending
-    if (!target) return
-    const deactivating = target.status !== 'Desactivada'
-    const updated = experiences.map((item) =>
-      item.id === target.id
-        ? deactivating
-          ? { ...item, status: 'Desactivada', previousStatus: item.status, color: statusStyles.Desactivada }
-          : { ...item, status: item.previousStatus ?? 'Borrador', previousStatus: undefined, color: statusStyles[item.previousStatus ?? 'Borrador'] }
-        : item,
-    )
-    try {
-      saveOperatorCollection(user, 'experiences', updated)
-      setExperiences(updated)
-      setFeedback(deactivating ? `«${target.title}» quedó desactivada.` : `«${target.title}» volvió a estar activa.`)
-    } catch (error) {
-      setFeedback(`No se pudo guardar el cambio: ${error.message}`)
+    let cancelled = false
+    async function fetchItems() {
+      try {
+        const response = await getMyExperiences({
+          pageNumber: 1,
+          pageSize: 100,
+          status: statusFilter || undefined,
+        })
+        if (!cancelled) {
+          setErrorBanner('')
+          setExperiences(response?.data ?? [])
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setErrorBanner(extractApiError(error, 'No se pudieron cargar tus experiencias.').message)
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
     }
-    setPending(null)
+    fetchItems()
+    return () => {
+      cancelled = true
+    }
+  }, [statusFilter, reloadKey])
+
+  const filtered = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase()
+    if (!q) return experiences
+    return experiences.filter(
+      (exp) =>
+        exp.title.toLowerCase().includes(q) ||
+        (exp.municipalityName ?? '').toLowerCase().includes(q) ||
+        (exp.departmentName ?? '').toLowerCase().includes(q),
+    )
+  }, [experiences, searchTerm])
+
+  async function handlePublish(exp) {
+    setBusyId(exp.id)
+    setMissingFieldsAlert([])
+    try {
+      await publishExperience(exp.id)
+      notify.success(`"${exp.title}" fue publicada en el catálogo.`)
+      await loadExperiences()
+    } catch (error) {
+      const parsed = extractApiError(error, 'No se pudo publicar la experiencia.')
+      if (parsed.missingFields.length > 0) {
+        setMissingFieldsAlert(parsed.missingFields)
+      }
+      notify.error(parsed.message)
+    } finally {
+      setBusyId('')
+    }
+  }
+
+  async function handlePause(exp) {
+    setBusyId(exp.id)
+    try {
+      await pauseExperience(exp.id)
+      notify.success(`"${exp.title}" fue pausada.`)
+      await loadExperiences()
+    } catch (error) {
+      notify.error(extractApiError(error).message)
+    } finally {
+      setBusyId('')
+    }
+  }
+
+  async function handleDelete(exp) {
+    const confirmed = window.confirm(
+      `¿Archivar (borrado lógico) "${exp.title}"? Si tiene reservas futuras activas, pasarán a PENDIENTE_DECISION (RN-21) y se notificará a los visitantes.`,
+    )
+    if (!confirmed) return
+    setBusyId(exp.id)
+    try {
+      await deleteExperience(exp.id)
+      notify.success(`"${exp.title}" fue archivada correctamente.`)
+      await loadExperiences()
+    } catch (error) {
+      notify.error(extractApiError(error).message)
+    } finally {
+      setBusyId('')
+    }
   }
 
   return (
-    <div className="space-y-7 lg:space-y-9">
-      <div className="flex items-start justify-between gap-3">
+    <div className="space-y-6">
+      <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-ink">Mis experiencias</h1>
-          <p className="mt-2 text-sm leading-6 text-muted">
-            Administra las actividades que ofreces a los viajeros.
+          <p className="text-xs font-bold uppercase tracking-wide text-brand">Catálogo del operador</p>
+          <h1 className="mt-1 text-3xl font-bold text-ink">Mis experiencias</h1>
+          <p className="mt-1 text-sm text-muted">
+            Crea, edita, publica, pausa o archiva tus experiencias turísticas.
           </p>
         </div>
         <Link
           to="/operador/experiencias/nueva"
-          aria-label="Agregar experiencia"
-          className="grid h-12 w-12 shrink-0 place-items-center rounded-full border border-black/10 bg-brand text-2xl font-medium text-white transition hover:bg-brand-dark"
+          className="rounded-full bg-brand px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-dark"
         >
-          +
+          + Nueva experiencia
         </Link>
-      </div>
+      </header>
 
-      {notice && (
-        <p role="status" className="rounded-xl border border-emerald-900/15 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-          {notice}
-        </p>
-      )}
-
-      <section className="grid gap-4 rounded-2xl border border-black/10 bg-white p-5 shadow-sm md:grid-cols-[minmax(240px,1fr)_auto] md:items-center lg:p-6">
-        <label htmlFor="experience-search" className="sr-only">Buscar experiencias</label>
-        <input
-          id="experience-search"
-          type="search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Buscar experiencias"
-          className="min-h-12 w-full rounded-xl border border-black/15 bg-white px-4 text-sm text-ink outline-none placeholder:text-muted focus:border-brand focus:ring-2 focus:ring-brand/15"
-        />
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <FilterSelect
           label="Filtrar por estado"
-          options={statusOptions}
-          value={status}
-          onChange={(event) => setStatus(event.target.value)}
+          options={statusFilters}
+          value={statusFilter}
+          onChange={(event) => setStatusFilter(event.target.value)}
           className="min-h-12 md:w-56"
         />
-      </section>
 
-      {filteredExperiences.length ? (
-        <section className="grid gap-5 sm:grid-cols-2 2xl:grid-cols-3">
-          {filteredExperiences.map((experience) => (
-            <article key={experience.id} className={`overflow-hidden rounded-2xl border border-black/10 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${experience.status === 'Desactivada' || experience.status === 'Retirada' ? 'opacity-70' : ''}`}>
-              <div className="grid h-44 place-items-center bg-info-soft text-5xl" aria-hidden="true">
-                {categoryIcons[experience.category] ?? '✨'}
-              </div>
-              <div className="p-5 lg:p-6">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <h2 className="text-lg font-bold leading-6 text-ink">{experience.title}</h2>
-                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold ${statusStyles[experience.status] ?? statusStyles.Borrador}`}>
-                    {experience.status}
-                  </span>
-                </div>
-                <p className="mt-1 text-xs text-muted">
-                  {experience.category} · {experience.location}
-                </p>
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
-                  <span className="font-semibold text-ink">
-                    {formatCurrency(experience.price)} <span className="font-normal text-muted">/ persona</span>
-                  </span>
-                  <span className="text-muted">{experience.bookings} reservas</span>
-                </div>
-                <Link
-                  to={`/operador/experiencias/nueva?editar=${encodeURIComponent(experience.id)}`}
-                  className="mt-5 flex min-h-11 items-center justify-center rounded-xl border border-black/15 text-sm font-semibold text-brand transition hover:border-brand hover:bg-info-soft"
-                >
-                  Editar experiencia
-                </Link>
-                {experience.status === 'Retirada' && (
-                  <p role="note" className="mt-3 rounded-xl bg-danger-soft px-3 py-2 text-xs leading-5 text-danger">
-                    <strong>Retirada por el administrador.</strong>{' '}
-                    {experience.withdrawReason ? `Motivo: ${experience.withdrawReason}` : 'Contacta a soporte para más detalles.'}
-                  </p>
-                )}
-                {experience.status !== 'Retirada' && (
-                <button
-                  type="button"
-                  onClick={() => setPending(experience)}
-                  aria-label={`${experience.status === 'Desactivada' ? 'Reactivar' : 'Desactivar'} ${experience.title}`}
-                  className="mt-2 w-full rounded-xl py-2 text-sm font-semibold text-muted transition hover:bg-canvas hover:text-danger"
-                >
-                  {experience.status === 'Desactivada' ? 'Reactivar' : 'Desactivar'}
-                </button>
-                )}
-              </div>
-            </article>
-          ))}
-        </section>
-      ) : (
-        <div className="rounded-2xl border border-dashed border-black/20 bg-white px-5 py-14 text-center sm:col-span-2 2xl:col-span-3">
-          <p className="font-semibold text-ink">No encontramos experiencias</p>
-          <p className="mt-1 text-sm text-muted">Prueba con otro término o estado.</p>
+        <input
+          type="search"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="Buscar por título o municipio..."
+          aria-label="Buscar mis experiencias"
+          className="w-full rounded-xl border border-mist bg-surface px-3.5 py-2 text-sm text-ink sm:w-64"
+        />
+      </div>
+
+      {errorBanner && (
+        <div role="alert" className="rounded-2xl border border-danger/30 bg-danger-soft p-4 text-sm text-danger">
+          {errorBanner}
         </div>
       )}
 
-      {pending && (
-        <Dialog
-          title={pending.status === 'Desactivada' ? '¿Reactivar esta experiencia?' : '¿Desactivar esta experiencia?'}
-          onClose={() => setPending(null)}
-        >
-          <p className="mt-3 text-sm text-muted">
-            {pending.status === 'Desactivada'
-              ? `«${pending.title}» volverá a estar como ${pending.previousStatus ?? 'Borrador'}.`
-              : `«${pending.title}» dejará de mostrarse a los viajeros y no recibirá nuevas reservas. No se borra: podrás reactivarla cuando quieras.`}
-            {pending.status !== 'Desactivada' && pending.bookings > 0
-              ? ` Tiene ${pending.bookings} ${pending.bookings === 1 ? 'reserva' : 'reservas'}; revísalas en el Historial de Reservas.`
-              : ''}
+      {missingFieldsAlert.length > 0 && (
+        <div role="alert" className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+          <p className="font-bold">Faltan requisitos para publicar esta experiencia (RN-23):</p>
+          <ul className="mt-2 list-disc pl-5 text-xs">
+            {missingFieldsAlert.map((item, idx) => (
+              <li key={idx}>{item}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="space-y-3">
+          {[1, 2, 3].map((n) => (
+            <div key={n} className="h-28 animate-pulse rounded-2xl border border-mist bg-surface" />
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-mist bg-surface p-12 text-center">
+          <p className="text-lg font-bold text-ink">No hay experiencias registradas</p>
+          <p className="mt-1 text-sm text-muted">
+            Crea tu primera experiencia con fotos, ubicación en mapa y cupos.
           </p>
-          <div className="mt-6 flex justify-end gap-3">
-            <button
-              type="button"
-              onClick={() => setPending(null)}
-              className="rounded-xl border border-black/15 px-5 py-2.5 text-sm font-semibold text-ink hover:bg-canvas"
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={confirmChange}
-              className={`rounded-xl px-5 py-2.5 text-sm font-bold text-white ${
-                pending.status === 'Desactivada' ? 'bg-brand hover:bg-brand-dark' : 'bg-danger hover:opacity-90'
-              }`}
-            >
-              {pending.status === 'Desactivada' ? 'Reactivar' : 'Desactivar'}
-            </button>
-          </div>
-        </Dialog>
+          <Link
+            to="/operador/experiencias/nueva"
+            className="mt-5 inline-block rounded-full bg-brand px-6 py-2.5 text-sm font-bold text-white"
+          >
+            Crear experiencia
+          </Link>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {filtered.map((exp) => {
+            const st = experienceStatusMeta[exp.status] ?? { label: exp.status, tone: 'neutral' }
+            const cover = exp.images?.find((i) => i.isCover) || exp.images?.[0]
+            const isBusy = busyId === exp.id
+
+            return (
+              <article
+                key={exp.id}
+                className="flex flex-wrap items-center gap-5 rounded-2xl border border-mist bg-surface p-5"
+              >
+                {cover?.url ? (
+                  <img
+                    src={resolveAssetUrl(cover.url)}
+                    alt={exp.title}
+                    className="h-24 w-36 shrink-0 rounded-xl object-cover"
+                  />
+                ) : (
+                  <div className="grid h-24 w-36 shrink-0 place-items-center rounded-xl bg-info-soft text-xs font-semibold text-brand">
+                    Sin foto
+                  </div>
+                )}
+
+                <div className="min-w-0 flex-1 space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Pill tone={st.tone}>{st.label}</Pill>
+                    <span className="text-xs text-muted">
+                      {exp.municipalityName}, {exp.departmentName}
+                    </span>
+                  </div>
+                  <h2 className="text-lg font-bold text-ink">{exp.title}</h2>
+                  <p className="text-xs text-muted">
+                    {formatCurrency(exp.price, exp.currency)} · {formatDuration(exp.durationMinutes)} ·{' '}
+                    {exp.hasLimitedCapacity ? `Cupo ${exp.minPeople}–${exp.maxPeople}` : 'Sin límite'} ·{' '}
+                    {exp.images?.length ?? 0} foto(s)
+                  </p>
+                  {exp.withdrawalReason && (
+                    <p className="text-xs font-medium text-danger">
+                      Motivo de retiro: {exp.withdrawalReason}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <Link
+                    to={`/operador/experiencias/nueva?editar=${exp.id}`}
+                    className="rounded-full border border-mist px-3.5 py-1.5 text-xs font-semibold text-ink hover:border-brand"
+                  >
+                    Editar
+                  </Link>
+                  <Link
+                    to={`/operador/cupos?experiencia=${exp.id}`}
+                    className="rounded-full border border-mist px-3.5 py-1.5 text-xs font-semibold text-ink hover:border-brand"
+                  >
+                    Cupos
+                  </Link>
+                  {(exp.status === 'BORRADOR' || exp.status === 'PAUSADA') && (
+                    <button
+                      type="button"
+                      disabled={isBusy}
+                      onClick={() => handlePublish(exp)}
+                      className="rounded-full bg-brand px-3.5 py-1.5 text-xs font-bold text-white hover:bg-brand-dark disabled:opacity-50"
+                    >
+                      Publicar
+                    </button>
+                  )}
+                  {exp.status === 'PUBLICADA' && (
+                    <button
+                      type="button"
+                      disabled={isBusy}
+                      onClick={() => handlePause(exp)}
+                      className="rounded-full border border-amber-400 px-3.5 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-50 disabled:opacity-50"
+                    >
+                      Pausar
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    disabled={isBusy}
+                    onClick={() => handleDelete(exp)}
+                    className="rounded-full border border-danger/40 px-3.5 py-1.5 text-xs font-semibold text-danger hover:bg-danger-soft disabled:opacity-50"
+                  >
+                    Archivar
+                  </button>
+                </div>
+              </article>
+            )
+          })}
+        </div>
       )}
     </div>
   )
