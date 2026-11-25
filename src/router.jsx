@@ -43,7 +43,7 @@ function AppRoutes() {
   return (
     <Routes>
       {/* Panel de operador: requiere rol OPERADOR o ADMIN */}
-      <Route element={<ProtectedRoute roles={[Roles.OPERADOR, Roles.ADMIN]} />}>
+      {/* <Route element={<ProtectedRoute roles={[Roles.OPERADOR, Roles.ADMIN]} />}>*/ }
         <Route path="/operador" element={<OperatorLayout />}>
           <Route index element={<OperatorDashboard />} />
           <Route path="experiencias" element={<OperatorExperiences />} />
@@ -58,7 +58,7 @@ function AppRoutes() {
           <Route path="resenas" element={<OperatorReviews />} />
           <Route path="configuracion" element={<OperatorSettings />} />
         </Route>
-      </Route>
+     {/*</Route>*/} 
 
       {/* Panel de administración: requiere rol ADMIN */}
       <Route element={<ProtectedRoute roles={[Roles.ADMIN]} />}>

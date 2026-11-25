@@ -1,4 +1,4 @@
-import { GoogleOAuthProvider } from '@react-oauth/google'
+/*import { GoogleOAuthProvider } from '@react-oauth/google'
 import { Toaster } from 'sonner'
 import { AuthProvider } from './context/AuthContext.jsx'
 import AppRoutes from './router.jsx'
@@ -18,3 +18,12 @@ function App() {
 }
 
 export default App
+*/ 
+
+import Metricas from "./pages/Operators/Metricas.jsx";
+
+function App() {
+  return <Metricas />;
+}
+
+export default App;
